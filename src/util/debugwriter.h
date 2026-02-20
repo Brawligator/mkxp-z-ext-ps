@@ -30,6 +30,7 @@
 #include <android/log.h>
 #endif
 
+extern void (*debugOutputHandler)(const std::string &line);
 
 /* A cheap replacement for qDebug() */
 
@@ -64,7 +65,10 @@ public:
 #ifdef __ANDROID__
 		__android_log_write(ANDROID_LOG_DEBUG, "mkxp", buf.str().c_str());
 #else
-		std::cerr << buf.str() << std::endl;
+		if (debugOutputHandler)
+			debugOutputHandler(buf.str());
+		else
+			std::cerr << buf.str() << std::endl;
 #endif
 	}
 
