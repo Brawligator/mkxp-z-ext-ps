@@ -74,7 +74,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: mkxp-z.windows.${{github.event_name == 'pull_request' && format('PR{0}', github.event.number) || github.ref_name}}-${{steps.short-sha.outputs.sha}}
+          name: mkxp-z.windows.${{github.event_name == 'pull_request' && format('PR{0}', github.event.number) || replace(github.ref_name, '/', '.')}}-${{steps.short-sha.outputs.sha}}
           path: build/artifact
 
   build-linux-native:
@@ -125,7 +125,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: mkxp-z.linux.ubuntu.22.04.x86_64.${{github.event_name == 'pull_request' && format('PR{0}', github.event.number) || github.ref_name}}-${{steps.short-sha.outputs.sha}}
+          name: mkxp-z.linux.ubuntu.22.04.x86_64.${{github.event_name == 'pull_request' && format('PR{0}', github.event.number) || replace(github.ref_name, '/', '.')}}-${{steps.short-sha.outputs.sha}}
           path: build/local
 
   build-linux-cross:
@@ -230,7 +230,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: mkxp-z.linux.ubuntu.22.04.${{matrix.arch_mkxpz}}.${{github.event_name == 'pull_request' && format('PR{0}', github.event.number) || github.ref_name}}-${{steps.short-sha.outputs.sha}}
+          name: mkxp-z.linux.ubuntu.22.04.${{matrix.arch_mkxpz}}.${{github.event_name == 'pull_request' && format('PR{0}', github.event.number) || replace(github.ref_name, '/', '.')}}-${{steps.short-sha.outputs.sha}}
           path: build/local
 
   build-linux-native-container:
@@ -285,7 +285,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: mkxp-z.linux.debian.trixie.x86_64.${{github.event_name == 'pull_request' && format('PR{0}', github.event.number) || github.ref_name}}-${{steps.short-sha.outputs.sha}}
+          name: mkxp-z.linux.debian.trixie.x86_64.${{github.event_name == 'pull_request' && format('PR{0}', github.event.number) || replace(github.ref_name, '/', '.')}}-${{steps.short-sha.outputs.sha}}
           path: build/local
 
   build-linux-cross-container:
@@ -386,7 +386,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: mkxp-z.linux.debian.trixie.${{matrix.arch_mkxpz}}.${{github.event_name == 'pull_request' && format('PR{0}', github.event.number) || github.ref_name}}-${{steps.short-sha.outputs.sha}}
+          name: mkxp-z.linux.debian.trixie.${{matrix.arch_mkxpz}}.${{github.event_name == 'pull_request' && format('PR{0}', github.event.number) || replace(github.ref_name, '/', '.')}}-${{steps.short-sha.outputs.sha}}
           path: build/local
 
   build-macos:
@@ -437,5 +437,5 @@ jobs:
       - name: Upload archive
         uses: actions/upload-artifact@v4
         with:
-          name: mkxp-z.macos.${{github.event_name == 'pull_request' && format('PR{0}', github.event.number) || github.ref_name}}-${{steps.short-sha.outputs.sha}}
+          name: mkxp-z.macos.${{github.event_name == 'pull_request' && format('PR{0}', github.event.number) || replace(github.ref_name, '/', '.')}}-${{steps.short-sha.outputs.sha}}
           path: build/Build/Products/Release/Z-universal.app.zip
