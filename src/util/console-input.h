@@ -19,6 +19,9 @@ public:
 	/* Returns the next queued command, or empty string if none */
 	bool poll(std::string &out);
 
+	/* Write a line to the console, clearing and restoring the prompt */
+	void writeLine(const std::string &line);
+
 private:
 	static int readerThreadFun(void *data);
 
@@ -27,5 +30,9 @@ private:
 	std::queue<std::string> queue;
 	bool running;
 };
+
+/* Global output hook used by Debug class.
+ * When set, Debug routes output through this instead of cerr. */
+extern void (*debugOutputHandler)(const std::string &line);
 
 #endif // CONSOLE_INPUT_H
