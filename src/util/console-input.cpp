@@ -3,8 +3,6 @@
 #include <iostream>
 #include <string>
 
-void (*debugOutputHandler)(const std::string &line) = nullptr;
-
 ConsoleInput::ConsoleInput()
     : thread(nullptr),
       mutex(SDL_CreateMutex()),
@@ -57,32 +55,15 @@ bool ConsoleInput::poll(std::string &out)
 	return true;
 }
 
-void ConsoleInput::writeLine(const std::string &line)
-{
-	SDL_LockMutex(mutex);
-
-	/* Move cursor to column 0, clear the line, print output,
-	 * then reprint the prompt */
-	std::cout << "\r\033[K" << line << std::endl;
-	std::cout << ">> " << std::flush;
-
-	SDL_UnlockMutex(mutex);
-}
-
 int ConsoleInput::readerThreadFun(void *data)
 {
 	ConsoleInput *self = static_cast<ConsoleInput *>(data);
 	std::string line;
 
-	std::cout << ">> " << std::flush;
-
 	while (self->running && std::getline(std::cin, line))
 	{
 		if (line.empty())
-		{
-			std::cout << ">> " << std::flush;
 			continue;
-		}
 
 		SDL_LockMutex(self->mutex);
 		self->queue.push(line);

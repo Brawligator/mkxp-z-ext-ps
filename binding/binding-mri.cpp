@@ -159,7 +159,6 @@ json5pp::value rb2json(VALUE v);
 
 RB_METHOD(mkxpParseCSV);
 RB_METHOD(mkxpConsolePoll);
-RB_METHOD(mkxpConsoleWrite);
 
 static void mriBindingInit() {
     tableBindingInit();
@@ -231,7 +230,6 @@ static void mriBindingInit() {
     _rb_define_module_function(mod, "show_settings", mkxpSettingsMenu);
     _rb_define_module_function(mod, "puts", mkxpPuts);
     _rb_define_module_function(mod, "_console_poll", mkxpConsolePoll);
-    _rb_define_module_function(mod, "_console_write", mkxpConsoleWrite);
     _rb_define_module_function(mod, "desensitize", mkxpDesensitize);
     _rb_define_module_function(mod, "platform", mkxpPlatform);
     
@@ -420,18 +418,6 @@ RB_METHOD(mkxpConsolePoll) {
     std::string cmd;
     if (consoleInput->poll(cmd))
         return rb_utf8_str_new(cmd.c_str(), cmd.size());
-
-    return Qnil;
-}
-
-RB_METHOD(mkxpConsoleWrite) {
-    RB_UNUSED_PARAM;
-
-    const char *str;
-    rb_get_args(argc, argv, "z", &str RB_ARG_END);
-
-    if (consoleInput)
-        consoleInput->writeLine(str);
 
     return Qnil;
 }
@@ -1326,11 +1312,6 @@ static void mriBindingExecute() {
         consoleInput = new ConsoleInput();
         consoleInput->start();
 
-        debugOutputHandler = [](const std::string &line) {
-            if (consoleInput)
-                consoleInput->writeLine(line);
-        };
-
         rb_eval_string(
             "Thread.new do\n"
             "  loop do\n"
@@ -1338,11 +1319,13 @@ static void mriBindingExecute() {
             "    if cmd\n"
             "      begin\n"
             "        result = eval(cmd, TOPLEVEL_BINDING, \"(console)\", 1)\n"
-            "        System._console_write(\"=> \" + result.inspect)\n"
+            "        $stderr.puts(\"=> \" + result.inspect)\n"
             "      rescue Exception => e\n"
-            "        System._console_write(e.class.to_s + \": \" + e.message)\n"
-            "        e.backtrace.each { |l| System._console_write(\"  \" + l) }\n"
+            "        $stderr.puts(e.class.to_s + \": \" + e.message)\n"
+            "        e.backtrace.each { |l| $stderr.puts(\"  \" + l) }\n"
             "      end\n"
+            "      $stderr.print(\">> \")\n"
+            "      $stderr.flush\n"
             "    else\n"
             "      sleep(0.05)\n"
             "    end\n"
@@ -1367,7 +1350,6 @@ static void mriBindingExecute() {
     
     if (consoleInput)
     {
-        debugOutputHandler = nullptr;
         consoleInput->stop();
         delete consoleInput;
         consoleInput = nullptr;
