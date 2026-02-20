@@ -28,6 +28,7 @@
 #include "util/util.h"
 #include "util/sdl-util.h"
 #include "util/debugwriter.h"
+#include "util/console-input.h"
 #include "util/boost-hash.h"
 #include "util/exception.h"
 #include "util/encoding.h"
@@ -71,6 +72,8 @@ extern const char module_rpg3[];
 static void mriBindingExecute();
 static void mriBindingTerminate();
 static void mriBindingReset();
+
+static ConsoleInput *consoleInput = nullptr;
 
 ScriptBinding scriptBindingImpl = {mriBindingExecute, mriBindingTerminate,
     mriBindingReset};
@@ -155,6 +158,7 @@ VALUE json2rb(json5pp::value const &v);
 json5pp::value rb2json(VALUE v);
 
 RB_METHOD(mkxpParseCSV);
+RB_METHOD(mkxpConsolePoll);
 
 static void mriBindingInit() {
     tableBindingInit();
@@ -225,6 +229,7 @@ static void mriBindingInit() {
     _rb_define_module_function(mod, "window_title=", mkxpSetTitle);
     _rb_define_module_function(mod, "show_settings", mkxpSettingsMenu);
     _rb_define_module_function(mod, "puts", mkxpPuts);
+    _rb_define_module_function(mod, "_console_poll", mkxpConsolePoll);
     _rb_define_module_function(mod, "desensitize", mkxpDesensitize);
     _rb_define_module_function(mod, "platform", mkxpPlatform);
     
@@ -400,7 +405,20 @@ RB_METHOD(mkxpPuts) {
     rb_get_args(argc, argv, "z", &str RB_ARG_END);
     
     Debug() << str;
-    
+
+    return Qnil;
+}
+
+RB_METHOD(mkxpConsolePoll) {
+    RB_UNUSED_PARAM;
+
+    if (!consoleInput)
+        return Qnil;
+
+    std::string cmd;
+    if (consoleInput->poll(cmd))
+        return rb_utf8_str_new(cmd.c_str(), cmd.size());
+
     return Qnil;
 }
 
@@ -1288,7 +1306,36 @@ static void mriBindingExecute() {
     BacktraceData btData;
     
     mriBindingInit();
-    
+
+    if (conf.editor.debug)
+    {
+        consoleInput = new ConsoleInput();
+        consoleInput->start();
+
+        rb_eval_string(
+            "Thread.new do\n"
+            "  loop do\n"
+            "    cmd = System._console_poll\n"
+            "    if cmd\n"
+            "      begin\n"
+            "        result = eval(cmd, TOPLEVEL_BINDING, \"(console)\", 1)\n"
+            "        $stdout.puts(\"=> \" + result.inspect)\n"
+            "        $stdout.print(\">> \")\n"
+            "        $stdout.flush\n"
+            "      rescue Exception => e\n"
+            "        $stderr.puts(e.class.to_s + \": \" + e.message)\n"
+            "        e.backtrace.each { |l| $stderr.puts(\"  \" + l) }\n"
+            "        $stdout.print(\">> \")\n"
+            "        $stdout.flush\n"
+            "      end\n"
+            "    else\n"
+            "      sleep(0.05)\n"
+            "    end\n"
+            "  end\n"
+            "end\n"
+        );
+    }
+
     std::string &customScript = conf.customScript;
     if (!customScript.empty())
         runCustomScript(customScript);
@@ -1303,8 +1350,15 @@ static void mriBindingExecute() {
     if (!NIL_P(exc) && !rb_obj_is_kind_of(exc, rb_eSystemExit))
         showExc(exc, btData);
     
+    if (consoleInput)
+    {
+        consoleInput->stop();
+        delete consoleInput;
+        consoleInput = nullptr;
+    }
+
     ruby_cleanup(0);
-    
+
     shState->rtData().rqTermAck.set();
 }
 
