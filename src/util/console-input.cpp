@@ -328,14 +328,9 @@ void ConsoleInput::redrawInput()
 
 void ConsoleInput::submitLine()
 {
-	/* Replace the current line with a syntax-highlighted copy,
-	 * then advance to the next line.  This is the ONE copy
-	 * of the command that remains in scrollback. */
-	rawWrite("\r\033[K");
-	rawWrite(CLR_PROMPT);
-	rawWrite(PROMPT, PROMPT_LEN);
-	rawWrite(CLR_RESET);
-	rawWrite(highlightRuby(inputLine));
+	/* The current line already shows the highlighted command
+	 * (drawn by redrawInput during typing).  Just advance to
+	 * the next line, leaving that single copy in scrollback. */
 	rawWrite("\n");
 
 	if (!inputLine.empty())
@@ -353,8 +348,6 @@ void ConsoleInput::submitLine()
 	cursorPos = 0;
 	historyIndex = -1;
 	savedInput.clear();
-	/* Don't call redrawInput() here — let the main loop
-	 * draw the prompt after flushing any pending output. */
 }
 
 void ConsoleInput::handleArrowKey(char code)
@@ -498,28 +491,21 @@ int ConsoleInput::consoleThreadFun(void *data)
 
 	while (self->running)
 	{
-		bool needsRedraw = false;
-
 		/* Flush pending output from the queue (Debug(), _console_write) */
 		SDL_LockMutex(self->mutex);
-		bool hasOutput = !self->outputQueue.empty();
 
-		if (hasOutput)
+		while (!self->outputQueue.empty())
 		{
 			rawWrite("\r\033[K");
-
-			while (!self->outputQueue.empty())
-			{
-				auto &entry = self->outputQueue.front();
-				if (entry.second)
-					rawWrite(highlightRuby(entry.first));
-				else
-					rawWrite(entry.first);
-				rawWrite("\n");
-				self->outputQueue.pop();
-			}
-			needsRedraw = true;
+			auto &entry = self->outputQueue.front();
+			if (entry.second)
+				rawWrite(highlightRuby(entry.first));
+			else
+				rawWrite(entry.first);
+			rawWrite("\n");
+			self->outputQueue.pop();
 		}
+
 		SDL_UnlockMutex(self->mutex);
 
 #ifndef __WIN32__
@@ -528,8 +514,8 @@ int ConsoleInput::consoleThreadFun(void *data)
 		{
 			char buf[4096];
 			ssize_t n;
-			bool pipedAny = false;
 			char lastChar = 0;
+			bool pipedAny = false;
 
 			while ((n = read(stdoutPipe[0], buf, sizeof(buf))) > 0)
 			{
@@ -542,18 +528,15 @@ int ConsoleInput::consoleThreadFun(void *data)
 				lastChar = buf[n - 1];
 			}
 
-			if (pipedAny)
-			{
-				/* Ensure we end on a fresh line for the prompt */
-				if (lastChar != '\n')
-					rawWrite("\n");
-				needsRedraw = true;
-			}
+			if (pipedAny && lastChar != '\n')
+				rawWrite("\n");
 		}
 #endif
 
-		if (needsRedraw)
-			self->redrawInput();
+		/* Always redraw the prompt.  redrawInput() starts with
+		 * \r\033[K so calling it every iteration is idempotent
+		 * when nothing changed — it just refreshes the same line. */
+		self->redrawInput();
 
 		/* Wait for input */
 		if (!stdinReady(16))
@@ -566,8 +549,8 @@ int ConsoleInput::consoleThreadFun(void *data)
 		if (c == '\n' || c == '\r')
 		{
 			self->submitLine();
-			/* Consume a trailing \n or \r so that terminals
-			 * sending \r\n don't trigger a double-submit. */
+			/* Consume a trailing \r or \n so terminals that
+			 * send \r\n don't trigger a double-submit. */
 			if (stdinReady(5))
 			{
 				char next;
@@ -575,23 +558,13 @@ int ConsoleInput::consoleThreadFun(void *data)
 				{
 					if (next != '\n' && next != '\r')
 					{
-						/* Not part of the Enter sequence —
-						 * treat it as normal input. */
-						if (next == 27)
-						{
-							/* Escape — would need special handling,
-							 * but unlikely right after Enter. Skip. */
-						}
+						if (next >= 32)
+							self->insertChar(next);
 						else if (next == 127 || next == 8)
 							self->backspace();
-						else if (next >= 32)
-							self->insertChar(next);
 					}
 				}
 			}
-			/* Draw prompt immediately after submit so the user
-			 * sees it even before output arrives. */
-			self->redrawInput();
 			continue;
 		}
 		else if (c == 27)
