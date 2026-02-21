@@ -28,7 +28,6 @@ private:
 	static int consoleThreadFun(void *data);
 
 	void redrawInput();
-	void clearInput();
 	void submitLine();
 	void handleArrowKey(char code);
 	void insertChar(char c);

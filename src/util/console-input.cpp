@@ -22,18 +22,16 @@ static const size_t PROMPT_LEN = 3;
 
 /* --- ANSI color codes --- */
 #define CLR_RESET   "\033[0m"
-#define CLR_KEYWORD "\033[1;35m"  /* bold magenta */
-#define CLR_LITERAL "\033[36m"    /* cyan */
-#define CLR_STRING  "\033[32m"    /* green */
-#define CLR_SYMBOL  "\033[33m"    /* yellow */
-#define CLR_CONST   "\033[1;33m"  /* bold yellow */
-#define CLR_IVAR    "\033[31m"    /* red */
-#define CLR_GVAR    "\033[31m"    /* red */
-#define CLR_COMMENT "\033[90m"    /* gray */
-#define CLR_NUMBER  "\033[36m"    /* cyan */
-#define CLR_PROMPT  "\033[1;34m"  /* bold blue */
-#define CLR_RESULT  "\033[90m"    /* gray for => */
-#define CLR_ERROR   "\033[1;31m"  /* bold red */
+#define CLR_KEYWORD "\033[1;35m"
+#define CLR_LITERAL "\033[36m"
+#define CLR_STRING  "\033[32m"
+#define CLR_SYMBOL  "\033[33m"
+#define CLR_CONST   "\033[1;33m"
+#define CLR_IVAR    "\033[31m"
+#define CLR_GVAR    "\033[31m"
+#define CLR_COMMENT "\033[90m"
+#define CLR_NUMBER  "\033[36m"
+#define CLR_PROMPT  "\033[1;34m"
 
 static const std::set<std::string> &rubyKeywords()
 {
@@ -56,8 +54,6 @@ static bool isWordChar(char c)
 	return std::isalnum((unsigned char)c) || c == '_';
 }
 
-/* Simple Ruby syntax highlighter. Returns a string with ANSI codes.
- * Visible character count is unchanged. */
 static std::string highlightRuby(const std::string &src)
 {
 	std::string out;
@@ -68,7 +64,6 @@ static std::string highlightRuby(const std::string &src)
 
 	while (i < len)
 	{
-		/* Comment */
 		if (src[i] == '#')
 		{
 			out += CLR_COMMENT;
@@ -76,7 +71,6 @@ static std::string highlightRuby(const std::string &src)
 				out += src[i++];
 			out += CLR_RESET;
 		}
-		/* Double-quoted string */
 		else if (src[i] == '"')
 		{
 			out += CLR_STRING;
@@ -91,7 +85,6 @@ static std::string highlightRuby(const std::string &src)
 				out += src[i++];
 			out += CLR_RESET;
 		}
-		/* Single-quoted string */
 		else if (src[i] == '\'')
 		{
 			out += CLR_STRING;
@@ -106,61 +99,16 @@ static std::string highlightRuby(const std::string &src)
 				out += src[i++];
 			out += CLR_RESET;
 		}
-		/* Regex literal */
-		else if (src[i] == '/' && (i == 0 || !std::isalnum((unsigned char)src[i - 1])))
-		{
-			/* Heuristic: treat /.../ as regex only after operator or line start */
-			bool isRegex = (i == 0);
-			if (!isRegex && i > 0)
-			{
-				char prev = src[i - 1];
-				isRegex = (prev == '=' || prev == '(' || prev == ','
-				           || prev == '|' || prev == '!' || prev == '~'
-				           || prev == ' ' || prev == '\t');
-			}
-
-			if (isRegex)
-			{
-				out += CLR_STRING;
-				out += src[i++];
-				while (i < len && src[i] != '/')
-				{
-					if (src[i] == '\\' && i + 1 < len)
-						out += src[i++];
-					out += src[i++];
-				}
-				if (i < len)
-					out += src[i++];
-				/* Flags */
-				while (i < len && std::isalpha((unsigned char)src[i]))
-					out += src[i++];
-				out += CLR_RESET;
-			}
-			else
-			{
-				out += src[i++];
-			}
-		}
-		/* Symbol */
 		else if (src[i] == ':' && i + 1 < len
-		         && (std::isalpha((unsigned char)src[i + 1]) || src[i + 1] == '_'))
+		         && (std::isalpha((unsigned char)src[i + 1]) || src[i + 1] == '_')
+		         && (i == 0 || !isWordChar(src[i - 1])))
 		{
-			/* Make sure it's not a ternary or hash key colon */
-			bool isSymbol = (i == 0 || !isWordChar(src[i - 1]));
-			if (isSymbol)
-			{
-				out += CLR_SYMBOL;
+			out += CLR_SYMBOL;
+			out += src[i++];
+			while (i < len && (isWordChar(src[i]) || src[i] == '?' || src[i] == '!'))
 				out += src[i++];
-				while (i < len && (isWordChar(src[i]) || src[i] == '?' || src[i] == '!'))
-					out += src[i++];
-				out += CLR_RESET;
-			}
-			else
-			{
-				out += src[i++];
-			}
+			out += CLR_RESET;
 		}
-		/* Instance / class variable */
 		else if (src[i] == '@')
 		{
 			out += CLR_IVAR;
@@ -171,7 +119,6 @@ static std::string highlightRuby(const std::string &src)
 				out += src[i++];
 			out += CLR_RESET;
 		}
-		/* Global variable */
 		else if (src[i] == '$')
 		{
 			out += CLR_GVAR;
@@ -180,14 +127,9 @@ static std::string highlightRuby(const std::string &src)
 				out += src[i++];
 			out += CLR_RESET;
 		}
-		/* Number */
-		else if (std::isdigit((unsigned char)src[i])
-		         || (src[i] == '.' && i + 1 < len
-		             && std::isdigit((unsigned char)src[i + 1])
-		             && (i == 0 || !std::isalpha((unsigned char)src[i - 1]))))
+		else if (std::isdigit((unsigned char)src[i]))
 		{
 			out += CLR_NUMBER;
-			/* Hex */
 			if (src[i] == '0' && i + 1 < len && (src[i + 1] == 'x' || src[i + 1] == 'X'))
 			{
 				out += src[i++];
@@ -203,7 +145,6 @@ static std::string highlightRuby(const std::string &src)
 			}
 			out += CLR_RESET;
 		}
-		/* Word: keyword / literal / constant / identifier */
 		else if (std::isalpha((unsigned char)src[i]) || src[i] == '_')
 		{
 			size_t start = i;
@@ -244,6 +185,9 @@ static std::string highlightRuby(const std::string &src)
 }
 
 /* --- Terminal I/O helpers --- */
+
+/* All terminal output goes through rawWrite.
+ * We use \r\n explicitly since OPOST is disabled. */
 
 static void rawWrite(const char *str, size_t len)
 {
@@ -381,15 +325,9 @@ void ConsoleInput::redrawInput()
 	}
 }
 
-void ConsoleInput::clearInput()
-{
-	rawWrite("\r\033[K");
-}
-
 void ConsoleInput::submitLine()
 {
-	/* Just move past the current line — no need to re-echo
-	 * the command since it was already visible as the user typed */
+	/* Advance to next line — typed text stays visible above */
 	rawWrite("\r\n");
 
 	if (!inputLine.empty())
@@ -408,14 +346,18 @@ void ConsoleInput::submitLine()
 	historyIndex = -1;
 	savedInput.clear();
 
-	redrawInput();
+	/* Don't redraw prompt here — the eval result will
+	 * flush through the output queue and redraw it.
+	 * For empty lines (no command queued), draw it now. */
+	if (inputQueue.empty())
+		redrawInput();
 }
 
 void ConsoleInput::handleArrowKey(char code)
 {
 	switch (code)
 	{
-	case 'D': /* Left */
+	case 'D':
 		if (cursorPos > 0)
 		{
 			cursorPos--;
@@ -423,7 +365,7 @@ void ConsoleInput::handleArrowKey(char code)
 		}
 		break;
 
-	case 'C': /* Right */
+	case 'C':
 		if (cursorPos < inputLine.size())
 		{
 			cursorPos++;
@@ -431,7 +373,7 @@ void ConsoleInput::handleArrowKey(char code)
 		}
 		break;
 
-	case 'A': /* Up */
+	case 'A':
 	{
 		if (history.empty())
 			break;
@@ -456,7 +398,7 @@ void ConsoleInput::handleArrowKey(char code)
 		break;
 	}
 
-	case 'B': /* Down */
+	case 'B':
 	{
 		if (historyIndex == -1)
 			break;
@@ -520,7 +462,10 @@ int ConsoleInput::consoleThreadFun(void *data)
 	if (tcgetattr(STDIN_FILENO, &oldTerm) == 0)
 	{
 		newTerm = oldTerm;
+		/* Disable echo, canonical mode, and output post-processing
+		 * so we have full control over what hits the terminal */
 		newTerm.c_lflag &= ~((unsigned)ECHO | (unsigned)ICANON);
+		newTerm.c_oflag &= ~(unsigned)OPOST;
 		newTerm.c_cc[VMIN] = 0;
 		newTerm.c_cc[VTIME] = 0;
 		tcsetattr(STDIN_FILENO, TCSANOW, &newTerm);
@@ -538,7 +483,8 @@ int ConsoleInput::consoleThreadFun(void *data)
 
 		if (hasOutput)
 		{
-			self->clearInput();
+			/* Clear current prompt + input line */
+			rawWrite("\r\033[K");
 
 			while (!self->outputQueue.empty())
 			{
@@ -547,7 +493,7 @@ int ConsoleInput::consoleThreadFun(void *data)
 					rawWrite(highlightRuby(entry.first));
 				else
 					rawWrite(entry.first);
-				rawWrite("\r\n", 2);
+				rawWrite("\r\n");
 				self->outputQueue.pop();
 			}
 		}
@@ -602,19 +548,16 @@ int ConsoleInput::consoleThreadFun(void *data)
 		}
 		else if (c == 1)
 		{
-			/* Ctrl+A: Home */
 			self->cursorPos = 0;
 			self->redrawInput();
 		}
 		else if (c == 5)
 		{
-			/* Ctrl+E: End */
 			self->cursorPos = self->inputLine.size();
 			self->redrawInput();
 		}
 		else if (c == 3)
 		{
-			/* Ctrl+C: clear line */
 			self->inputLine.clear();
 			self->cursorPos = 0;
 			self->historyIndex = -1;
@@ -623,7 +566,6 @@ int ConsoleInput::consoleThreadFun(void *data)
 		}
 		else if (c == 21)
 		{
-			/* Ctrl+U: clear before cursor */
 			self->inputLine.erase(0, self->cursorPos);
 			self->cursorPos = 0;
 			self->redrawInput();
