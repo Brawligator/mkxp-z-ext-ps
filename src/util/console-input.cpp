@@ -186,8 +186,8 @@ static std::string highlightRuby(const std::string &src)
 
 /* --- Terminal I/O helpers --- */
 
-/* All terminal output goes through rawWrite.
- * We use \r\n explicitly since OPOST is disabled. */
+/* All terminal output goes through rawWrite to STDERR_FILENO.
+ * OPOST is kept enabled so \n is translated to \r\n by the driver. */
 
 static void rawWrite(const char *str, size_t len)
 {
@@ -327,8 +327,8 @@ void ConsoleInput::redrawInput()
 
 void ConsoleInput::submitLine()
 {
-	/* Clear the typed text and move to the next line */
-	rawWrite("\r\033[K\n");
+	/* Move to the next line — typed text stays visible as scrollback */
+	rawWrite("\n");
 
 	if (!inputLine.empty())
 	{
@@ -345,9 +345,6 @@ void ConsoleInput::submitLine()
 	cursorPos = 0;
 	historyIndex = -1;
 	savedInput.clear();
-
-	/* Always redraw the prompt immediately so the cursor
-	 * is visible while waiting for eval results. */
 	redrawInput();
 }
 
@@ -491,7 +488,7 @@ int ConsoleInput::consoleThreadFun(void *data)
 					rawWrite(highlightRuby(entry.first));
 				else
 					rawWrite(entry.first);
-				rawWrite("\r\n");
+				rawWrite("\n");
 				self->outputQueue.pop();
 			}
 		}
