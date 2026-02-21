@@ -6,6 +6,7 @@
 
 #include <queue>
 #include <string>
+#include <vector>
 
 class ConsoleInput
 {
@@ -20,17 +21,33 @@ public:
 	bool poll(std::string &out);
 
 	/* Queue a line for the console thread to print.
-	 * Safe to call from any thread. */
-	void writeLine(const std::string &line);
+	 * highlight: apply Ruby syntax highlighting when printing. */
+	void writeLine(const std::string &line, bool highlight = false);
 
 private:
 	static int consoleThreadFun(void *data);
 
+	void redrawInput();
+	void clearInput();
+	void submitLine();
+	void handleArrowKey(char code);
+	void insertChar(char c);
+	void backspace();
+	void deleteAtCursor();
+
 	SDL_Thread *thread;
 	SDL_mutex *mutex;
+
+	std::queue<std::pair<std::string, bool>> outputQueue;
 	std::queue<std::string> inputQueue;
-	std::queue<std::string> outputQueue;
+
 	std::string inputLine;
+	size_t cursorPos;
+
+	std::vector<std::string> history;
+	int historyIndex;
+	std::string savedInput;
+
 	bool running;
 
 #ifndef __WIN32__

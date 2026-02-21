@@ -431,7 +431,7 @@ RB_METHOD(mkxpConsoleWrite) {
     rb_get_args(argc, argv, "z", &str RB_ARG_END);
 
     if (consoleInput)
-        consoleInput->writeLine(str);
+        consoleInput->writeLine(str, true);
 
     return Qnil;
 }

@@ -2,6 +2,9 @@
 
 #include <string>
 #include <cstring>
+#include <cstdio>
+#include <cctype>
+#include <set>
 
 #ifdef __WIN32__
 #include <io.h>
@@ -14,8 +17,237 @@
 
 void (*debugOutputHandler)(const std::string &line) = nullptr;
 
+static const char *PROMPT = ">> ";
+static const size_t PROMPT_LEN = 3;
+
+/* --- ANSI color codes --- */
+#define CLR_RESET   "\033[0m"
+#define CLR_KEYWORD "\033[1;35m"  /* bold magenta */
+#define CLR_LITERAL "\033[36m"    /* cyan */
+#define CLR_STRING  "\033[32m"    /* green */
+#define CLR_SYMBOL  "\033[33m"    /* yellow */
+#define CLR_CONST   "\033[1;33m"  /* bold yellow */
+#define CLR_IVAR    "\033[31m"    /* red */
+#define CLR_GVAR    "\033[31m"    /* red */
+#define CLR_COMMENT "\033[90m"    /* gray */
+#define CLR_NUMBER  "\033[36m"    /* cyan */
+#define CLR_PROMPT  "\033[1;34m"  /* bold blue */
+#define CLR_RESULT  "\033[90m"    /* gray for => */
+#define CLR_ERROR   "\033[1;31m"  /* bold red */
+
+static const std::set<std::string> &rubyKeywords()
+{
+	static const std::set<std::string> kw = {
+		"alias", "and", "begin", "break", "case", "class", "def",
+		"defined?", "do", "else", "elsif", "end", "ensure", "for",
+		"if", "in", "module", "next", "not", "or", "raise", "redo",
+		"rescue", "retry", "return", "super", "then", "undef",
+		"unless", "until", "when", "while", "yield",
+		"require", "require_relative", "include", "extend",
+		"attr_reader", "attr_writer", "attr_accessor",
+		"public", "private", "protected", "lambda", "proc",
+		"puts", "print", "p"
+	};
+	return kw;
+}
+
+static bool isWordChar(char c)
+{
+	return std::isalnum((unsigned char)c) || c == '_';
+}
+
+/* Simple Ruby syntax highlighter. Returns a string with ANSI codes.
+ * Visible character count is unchanged. */
+static std::string highlightRuby(const std::string &src)
+{
+	std::string out;
+	out.reserve(src.size() * 2);
+
+	size_t i = 0;
+	size_t len = src.size();
+
+	while (i < len)
+	{
+		/* Comment */
+		if (src[i] == '#')
+		{
+			out += CLR_COMMENT;
+			while (i < len)
+				out += src[i++];
+			out += CLR_RESET;
+		}
+		/* Double-quoted string */
+		else if (src[i] == '"')
+		{
+			out += CLR_STRING;
+			out += src[i++];
+			while (i < len && src[i] != '"')
+			{
+				if (src[i] == '\\' && i + 1 < len)
+					out += src[i++];
+				out += src[i++];
+			}
+			if (i < len)
+				out += src[i++];
+			out += CLR_RESET;
+		}
+		/* Single-quoted string */
+		else if (src[i] == '\'')
+		{
+			out += CLR_STRING;
+			out += src[i++];
+			while (i < len && src[i] != '\'')
+			{
+				if (src[i] == '\\' && i + 1 < len)
+					out += src[i++];
+				out += src[i++];
+			}
+			if (i < len)
+				out += src[i++];
+			out += CLR_RESET;
+		}
+		/* Regex literal */
+		else if (src[i] == '/' && (i == 0 || !std::isalnum((unsigned char)src[i - 1])))
+		{
+			/* Heuristic: treat /.../ as regex only after operator or line start */
+			bool isRegex = (i == 0);
+			if (!isRegex && i > 0)
+			{
+				char prev = src[i - 1];
+				isRegex = (prev == '=' || prev == '(' || prev == ','
+				           || prev == '|' || prev == '!' || prev == '~'
+				           || prev == ' ' || prev == '\t');
+			}
+
+			if (isRegex)
+			{
+				out += CLR_STRING;
+				out += src[i++];
+				while (i < len && src[i] != '/')
+				{
+					if (src[i] == '\\' && i + 1 < len)
+						out += src[i++];
+					out += src[i++];
+				}
+				if (i < len)
+					out += src[i++];
+				/* Flags */
+				while (i < len && std::isalpha((unsigned char)src[i]))
+					out += src[i++];
+				out += CLR_RESET;
+			}
+			else
+			{
+				out += src[i++];
+			}
+		}
+		/* Symbol */
+		else if (src[i] == ':' && i + 1 < len
+		         && (std::isalpha((unsigned char)src[i + 1]) || src[i + 1] == '_'))
+		{
+			/* Make sure it's not a ternary or hash key colon */
+			bool isSymbol = (i == 0 || !isWordChar(src[i - 1]));
+			if (isSymbol)
+			{
+				out += CLR_SYMBOL;
+				out += src[i++];
+				while (i < len && (isWordChar(src[i]) || src[i] == '?' || src[i] == '!'))
+					out += src[i++];
+				out += CLR_RESET;
+			}
+			else
+			{
+				out += src[i++];
+			}
+		}
+		/* Instance / class variable */
+		else if (src[i] == '@')
+		{
+			out += CLR_IVAR;
+			out += src[i++];
+			if (i < len && src[i] == '@')
+				out += src[i++];
+			while (i < len && isWordChar(src[i]))
+				out += src[i++];
+			out += CLR_RESET;
+		}
+		/* Global variable */
+		else if (src[i] == '$')
+		{
+			out += CLR_GVAR;
+			out += src[i++];
+			while (i < len && (isWordChar(src[i]) || src[i] == '!' || src[i] == '?'))
+				out += src[i++];
+			out += CLR_RESET;
+		}
+		/* Number */
+		else if (std::isdigit((unsigned char)src[i])
+		         || (src[i] == '.' && i + 1 < len
+		             && std::isdigit((unsigned char)src[i + 1])
+		             && (i == 0 || !std::isalpha((unsigned char)src[i - 1]))))
+		{
+			out += CLR_NUMBER;
+			/* Hex */
+			if (src[i] == '0' && i + 1 < len && (src[i + 1] == 'x' || src[i + 1] == 'X'))
+			{
+				out += src[i++];
+				out += src[i++];
+				while (i < len && std::isxdigit((unsigned char)src[i]))
+					out += src[i++];
+			}
+			else
+			{
+				while (i < len && (std::isdigit((unsigned char)src[i])
+				                   || src[i] == '.' || src[i] == '_'))
+					out += src[i++];
+			}
+			out += CLR_RESET;
+		}
+		/* Word: keyword / literal / constant / identifier */
+		else if (std::isalpha((unsigned char)src[i]) || src[i] == '_')
+		{
+			size_t start = i;
+			while (i < len && (isWordChar(src[i]) || src[i] == '?' || src[i] == '!'))
+				i++;
+			std::string word = src.substr(start, i - start);
+
+			if (word == "true" || word == "false" || word == "nil" || word == "self")
+			{
+				out += CLR_LITERAL;
+				out += word;
+				out += CLR_RESET;
+			}
+			else if (rubyKeywords().count(word))
+			{
+				out += CLR_KEYWORD;
+				out += word;
+				out += CLR_RESET;
+			}
+			else if (std::isupper((unsigned char)word[0]))
+			{
+				out += CLR_CONST;
+				out += word;
+				out += CLR_RESET;
+			}
+			else
+			{
+				out += word;
+			}
+		}
+		else
+		{
+			out += src[i++];
+		}
+	}
+
+	return out;
+}
+
+/* --- Terminal I/O helpers --- */
+
 static void rawWrite(const char *str, size_t len)
 {
+	if (len == 0) return;
 #ifdef __WIN32__
 	DWORD written;
 	HANDLE h = GetStdHandle(STD_ERROR_HANDLE);
@@ -37,9 +269,45 @@ static void rawWrite(const std::string &s)
 	rawWrite(s.c_str(), s.size());
 }
 
+static void rawWrite(const char *str)
+{
+	rawWrite(str, strlen(str));
+}
+
+static bool stdinReady(int timeoutMs)
+{
+#ifdef __WIN32__
+	HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
+	return WaitForSingleObject(h, timeoutMs) == WAIT_OBJECT_0;
+#else
+	struct pollfd pfd;
+	pfd.fd = STDIN_FILENO;
+	pfd.events = POLLIN;
+	pfd.revents = 0;
+	return poll(&pfd, 1, timeoutMs) > 0 && (pfd.revents & POLLIN);
+#endif
+}
+
+static bool stdinReadChar(char &c)
+{
+#ifdef __WIN32__
+	HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
+	DWORD bytesRead = 0;
+	if (!ReadFile(h, &c, 1, &bytesRead, NULL) || bytesRead == 0)
+		return false;
+	return true;
+#else
+	return read(STDIN_FILENO, &c, 1) == 1;
+#endif
+}
+
+/* --- ConsoleInput implementation --- */
+
 ConsoleInput::ConsoleInput()
     : thread(nullptr),
       mutex(SDL_CreateMutex()),
+      cursorPos(0),
+      historyIndex(-1),
       running(false)
 #ifndef __WIN32__
       , rawModeSet(false)
@@ -89,11 +357,161 @@ bool ConsoleInput::poll(std::string &out)
 	return true;
 }
 
-void ConsoleInput::writeLine(const std::string &line)
+void ConsoleInput::writeLine(const std::string &line, bool highlight)
 {
 	SDL_LockMutex(mutex);
-	outputQueue.push(line);
+	outputQueue.push({line, highlight});
 	SDL_UnlockMutex(mutex);
+}
+
+void ConsoleInput::redrawInput()
+{
+	rawWrite("\r\033[K");
+	rawWrite(CLR_PROMPT);
+	rawWrite(PROMPT, PROMPT_LEN);
+	rawWrite(CLR_RESET);
+	rawWrite(highlightRuby(inputLine));
+
+	int back = (int)inputLine.size() - (int)cursorPos;
+	if (back > 0)
+	{
+		char buf[32];
+		snprintf(buf, sizeof(buf), "\033[%dD", back);
+		rawWrite(buf);
+	}
+}
+
+void ConsoleInput::clearInput()
+{
+	rawWrite("\r\033[K");
+}
+
+void ConsoleInput::submitLine()
+{
+	/* Print the final highlighted version of the submitted line */
+	clearInput();
+	rawWrite(CLR_PROMPT);
+	rawWrite(PROMPT, PROMPT_LEN);
+	rawWrite(CLR_RESET);
+	rawWrite(highlightRuby(inputLine));
+	rawWrite("\n", 1);
+
+	if (!inputLine.empty())
+	{
+		if (history.empty() || history.back() != inputLine)
+			history.push_back(inputLine);
+
+		SDL_LockMutex(mutex);
+		inputQueue.push(inputLine);
+		SDL_UnlockMutex(mutex);
+
+		inputLine.clear();
+	}
+
+	cursorPos = 0;
+	historyIndex = -1;
+	savedInput.clear();
+
+	redrawInput();
+}
+
+void ConsoleInput::handleArrowKey(char code)
+{
+	switch (code)
+	{
+	case 'D': /* Left */
+		if (cursorPos > 0)
+		{
+			cursorPos--;
+			redrawInput();
+		}
+		break;
+
+	case 'C': /* Right */
+		if (cursorPos < inputLine.size())
+		{
+			cursorPos++;
+			redrawInput();
+		}
+		break;
+
+	case 'A': /* Up */
+	{
+		if (history.empty())
+			break;
+
+		if (historyIndex == -1)
+		{
+			savedInput = inputLine;
+			historyIndex = (int)history.size() - 1;
+		}
+		else if (historyIndex > 0)
+		{
+			historyIndex--;
+		}
+		else
+		{
+			break;
+		}
+
+		inputLine = history[historyIndex];
+		cursorPos = inputLine.size();
+		redrawInput();
+		break;
+	}
+
+	case 'B': /* Down */
+	{
+		if (historyIndex == -1)
+			break;
+
+		if (historyIndex < (int)history.size() - 1)
+		{
+			historyIndex++;
+			inputLine = history[historyIndex];
+		}
+		else
+		{
+			historyIndex = -1;
+			inputLine = savedInput;
+			savedInput.clear();
+		}
+
+		cursorPos = inputLine.size();
+		redrawInput();
+		break;
+	}
+	}
+}
+
+void ConsoleInput::insertChar(char c)
+{
+	if (cursorPos == inputLine.size())
+		inputLine += c;
+	else
+		inputLine.insert(cursorPos, 1, c);
+
+	cursorPos++;
+	redrawInput();
+}
+
+void ConsoleInput::backspace()
+{
+	if (cursorPos == 0)
+		return;
+
+	inputLine.erase(cursorPos - 1, 1);
+	cursorPos--;
+	redrawInput();
+}
+
+void ConsoleInput::deleteAtCursor()
+{
+	if (cursorPos >= inputLine.size())
+		return;
+
+	inputLine.erase(cursorPos, 1);
+	redrawInput();
 }
 
 int ConsoleInput::consoleThreadFun(void *data)
@@ -101,7 +519,6 @@ int ConsoleInput::consoleThreadFun(void *data)
 	ConsoleInput *self = static_cast<ConsoleInput *>(data);
 
 #ifndef __WIN32__
-	/* Put terminal in raw mode: no echo, non-canonical */
 	struct termios oldTerm, newTerm;
 
 	if (tcgetattr(STDIN_FILENO, &oldTerm) == 0)
@@ -115,115 +532,113 @@ int ConsoleInput::consoleThreadFun(void *data)
 	}
 #endif
 
-	rawWrite(">> ");
+	self->redrawInput();
 
 	while (self->running)
 	{
-		/* Flush pending output, clearing current input line first */
+		/* Flush pending output */
 		SDL_LockMutex(self->mutex);
 		bool hasOutput = !self->outputQueue.empty();
 
 		if (hasOutput)
 		{
-			/* Clear the current prompt + input */
-			rawWrite("\r\033[K");
+			self->clearInput();
 
 			while (!self->outputQueue.empty())
 			{
-				rawWrite(self->outputQueue.front());
+				auto &entry = self->outputQueue.front();
+				if (entry.second)
+					rawWrite(highlightRuby(entry.first));
+				else
+					rawWrite(entry.first);
 				rawWrite("\n", 1);
 				self->outputQueue.pop();
 			}
 		}
-
 		SDL_UnlockMutex(self->mutex);
 
 		if (hasOutput)
-		{
-			/* Redraw prompt and current input buffer */
-			rawWrite(">> ");
-			SDL_LockMutex(self->mutex);
-			rawWrite(self->inputLine);
-			SDL_UnlockMutex(self->mutex);
-		}
+			self->redrawInput();
 
-		/* Poll stdin for input */
-#ifdef __WIN32__
-		HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
-		DWORD result = WaitForSingleObject(h, 50);
-		if (result != WAIT_OBJECT_0)
-			continue;
-
-		INPUT_RECORD ir;
-		DWORD eventsRead;
-		if (!PeekConsoleInput(h, &ir, 1, &eventsRead) || eventsRead == 0)
-			continue;
-		if (!ReadConsoleInput(h, &ir, 1, &eventsRead))
-			continue;
-		if (ir.EventType != KEY_EVENT || !ir.Event.KeyEvent.bKeyDown)
-			continue;
-
-		char c = ir.Event.KeyEvent.uChar.AsciiChar;
-#else
-		struct pollfd pfd;
-		pfd.fd = STDIN_FILENO;
-		pfd.events = POLLIN;
-		pfd.revents = 0;
-
-		if (poll(&pfd, 1, 50) <= 0 || !(pfd.revents & POLLIN))
+		/* Wait for input */
+		if (!stdinReady(50))
 			continue;
 
 		char c;
-		if (read(STDIN_FILENO, &c, 1) != 1)
+		if (!stdinReadChar(c))
 			break;
-#endif
 
 		if (c == '\n' || c == '\r')
 		{
-			rawWrite("\n", 1);
+			self->submitLine();
+		}
+		else if (c == 27)
+		{
+			if (!stdinReady(50))
+				continue;
 
-			SDL_LockMutex(self->mutex);
-			if (!self->inputLine.empty())
+			char seq;
+			if (!stdinReadChar(seq) || seq != '[')
+				continue;
+
+			if (!stdinReady(50))
+				continue;
+
+			char code;
+			if (!stdinReadChar(code))
+				continue;
+
+			if (code == '3')
 			{
-				self->inputQueue.push(self->inputLine);
-				self->inputLine.clear();
+				char tilde;
+				if (stdinReady(50) && stdinReadChar(tilde)
+				    && tilde == '~')
+					self->deleteAtCursor();
 			}
-			SDL_UnlockMutex(self->mutex);
-
-			rawWrite(">> ");
+			else
+			{
+				self->handleArrowKey(code);
+			}
 		}
 		else if (c == 127 || c == 8)
 		{
-			/* Backspace */
-			SDL_LockMutex(self->mutex);
-			if (!self->inputLine.empty())
-			{
-				self->inputLine.pop_back();
-				rawWrite("\b \b", 3);
-			}
-			SDL_UnlockMutex(self->mutex);
+			self->backspace();
+		}
+		else if (c == 1)
+		{
+			/* Ctrl+A: Home */
+			self->cursorPos = 0;
+			self->redrawInput();
+		}
+		else if (c == 5)
+		{
+			/* Ctrl+E: End */
+			self->cursorPos = self->inputLine.size();
+			self->redrawInput();
 		}
 		else if (c == 3)
 		{
-			/* Ctrl+C: clear current input */
-			SDL_LockMutex(self->mutex);
-			rawWrite("\r\033[K");
+			/* Ctrl+C: clear line */
 			self->inputLine.clear();
-			SDL_UnlockMutex(self->mutex);
-			rawWrite(">> ");
+			self->cursorPos = 0;
+			self->historyIndex = -1;
+			self->savedInput.clear();
+			self->redrawInput();
+		}
+		else if (c == 21)
+		{
+			/* Ctrl+U: clear before cursor */
+			self->inputLine.erase(0, self->cursorPos);
+			self->cursorPos = 0;
+			self->redrawInput();
 		}
 		else if (c >= 32)
 		{
-			/* Printable character */
-			SDL_LockMutex(self->mutex);
-			self->inputLine += c;
-			SDL_UnlockMutex(self->mutex);
-			rawWrite(&c, 1);
+			self->insertChar(c);
 		}
 	}
 
 #ifndef __WIN32__
-	/* Restore terminal */
 	if (self->rawModeSet)
 		tcsetattr(STDIN_FILENO, TCSANOW, &oldTerm);
 #endif
