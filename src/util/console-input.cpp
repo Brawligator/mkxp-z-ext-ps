@@ -388,13 +388,9 @@ void ConsoleInput::clearInput()
 
 void ConsoleInput::submitLine()
 {
-	/* Print the final highlighted version of the submitted line */
-	clearInput();
-	rawWrite(CLR_PROMPT);
-	rawWrite(PROMPT, PROMPT_LEN);
-	rawWrite(CLR_RESET);
-	rawWrite(highlightRuby(inputLine));
-	rawWrite("\n", 1);
+	/* Just move past the current line — no need to re-echo
+	 * the command since it was already visible as the user typed */
+	rawWrite("\r\n");
 
 	if (!inputLine.empty())
 	{
@@ -551,7 +547,7 @@ int ConsoleInput::consoleThreadFun(void *data)
 					rawWrite(highlightRuby(entry.first));
 				else
 					rawWrite(entry.first);
-				rawWrite("\n", 1);
+				rawWrite("\r\n", 2);
 				self->outputQueue.pop();
 			}
 		}
