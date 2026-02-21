@@ -451,14 +451,13 @@ RB_METHOD(mkxpConsoleWrite) {
 
 #if RAPI_FULL >= 200
 /* Walk the Ruby call stack and return the binding of the first
- * frame that is NOT Graphics and NOT a C-only frame.
- * Called directly from Graphics.update, so we iterate from
- * frame 0 upward, skip nil bindings (C frames) and any frame
- * where self == Graphics, and take the first real caller. */
+ * frame that is NOT our own internal code (Graphics / MKXP_Console).
+ * Called from MKXP_Console.process → Graphics.update → caller. */
 static VALUE captureCallerBindingCallback(const rb_debug_inspector_t *dc, void *ptr)
 {
     VALUE *out = static_cast<VALUE *>(ptr);
     VALUE graphics = rb_const_get(rb_cObject, rb_intern("Graphics"));
+    VALUE mkxp_con = rb_const_get(rb_cObject, rb_intern("MKXP_Console"));
     long len = RARRAY_LEN(rb_debug_inspector_backtrace_locations(dc));
     if (len > 10) len = 10;
 
@@ -469,7 +468,7 @@ static VALUE captureCallerBindingCallback(const rb_debug_inspector_t *dc, void *
             continue;
 
         VALUE frame_self = rb_debug_inspector_frame_self_get(dc, i);
-        if (frame_self == graphics)
+        if (frame_self == graphics || frame_self == mkxp_con)
             continue;
 
         *out = b;
@@ -1391,20 +1390,19 @@ static void mriBindingExecute() {
             "module MKXP_Console\n"
             "  @binding = TOPLEVEL_BINDING\n"
             "\n"
-            "  def self.binding=(b)\n"
-            "    @binding = b\n"
-            "  end\n"
-            "\n"
             "  def self.process\n"
-            "    while (cmd = System._console_poll)\n"
-            "      begin\n"
-            "        result = eval(cmd, @binding, \"(console)\", 1)\n"
-            "        System._console_write(\"=> \" + result.inspect)\n"
-            "      rescue Exception => e\n"
-            "        System._console_write(e.class.to_s + \": \" + e.message)\n"
-            "        e.backtrace.each { |l| System._console_write(\"  \" + l) }\n"
-            "      end\n"
+            "    cmd = System._console_poll\n"
+            "    return unless cmd\n"
+            "    b = System._capture_binding rescue nil\n"
+            "    @binding = b if b\n"
+            "    begin\n"
+            "      result = eval(cmd, @binding, \"(console)\", 1)\n"
+            "      System._console_write(\"=> \" + result.inspect)\n"
+            "    rescue Exception => e\n"
+            "      System._console_write(e.class.to_s + \": \" + e.message)\n"
+            "      e.backtrace.each { |l| System._console_write(\"  \" + l) }\n"
             "    end\n"
+            "    process\n"
             "  end\n"
             "end\n"
             "\n"
@@ -1412,8 +1410,6 @@ static void mriBindingExecute() {
             "  alias_method :_mkxp_console_original_update, :update\n"
             "  def update\n"
             "    _mkxp_console_original_update\n"
-            "    b = System._capture_binding rescue nil\n"
-            "    MKXP_Console.binding = b if b\n"
             "    MKXP_Console.process\n"
             "  end\n"
             "end\n"

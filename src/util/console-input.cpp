@@ -328,6 +328,10 @@ void ConsoleInput::redrawInput()
 
 void ConsoleInput::submitLine()
 {
+	/* Finalize the command line: move cursor to end, advance
+	 * to next line.  The typed text stays in scrollback. */
+	rawWrite("\n");
+
 	if (!inputLine.empty())
 	{
 		if (history.empty() || history.back() != inputLine)
@@ -343,9 +347,6 @@ void ConsoleInput::submitLine()
 	cursorPos = 0;
 	historyIndex = -1;
 	savedInput.clear();
-
-	/* Stay on the same line — just redraw as empty prompt.
-	 * The output flush will overwrite this line with the result. */
 	redrawInput();
 }
 
