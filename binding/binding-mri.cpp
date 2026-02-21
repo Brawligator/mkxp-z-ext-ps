@@ -1417,6 +1417,8 @@ static void mriBindingExecute() {
             "    MKXP_Console.process\n"
             "  end\n"
             "end\n"
+            "\n"
+            "$stdout.sync = true\n"
         );
     }
 

@@ -13,6 +13,7 @@
 #include <poll.h>
 #include <unistd.h>
 #include <termios.h>
+#include <fcntl.h>
 #endif
 
 void (*debugOutputHandler)(const std::string &line) = nullptr;
@@ -458,13 +459,30 @@ int ConsoleInput::consoleThreadFun(void *data)
 	{
 		newTerm = oldTerm;
 		/* Disable echo and canonical mode so we get raw keypresses.
-		 * Keep OPOST enabled so \n from other writers (Ruby's puts)
-		 * gets translated to \r\n by the terminal driver. */
+		 * Keep OPOST enabled so \n is translated to \r\n. */
 		newTerm.c_lflag &= ~((unsigned)ECHO | (unsigned)ICANON);
 		newTerm.c_cc[VMIN] = 0;
 		newTerm.c_cc[VTIME] = 0;
 		tcsetattr(STDIN_FILENO, TCSANOW, &newTerm);
 		self->rawModeSet = true;
+	}
+
+	/* Redirect stdout through a pipe so ALL Ruby output
+	 * (puts, print, p, etc.) is captured by this thread
+	 * instead of writing to the terminal unsynchronized. */
+	int stdoutPipe[2] = {-1, -1};
+	int savedStdout = -1;
+
+	if (pipe(stdoutPipe) == 0)
+	{
+		savedStdout = dup(STDOUT_FILENO);
+		dup2(stdoutPipe[1], STDOUT_FILENO);
+		close(stdoutPipe[1]);
+		stdoutPipe[1] = -1;
+		/* Make the read end non-blocking */
+		fcntl(stdoutPipe[0], F_SETFL, O_NONBLOCK);
+		/* Disable C-level buffering on the redirected stdout */
+		setvbuf(stdout, NULL, _IONBF, 0);
 	}
 #endif
 
@@ -472,13 +490,14 @@ int ConsoleInput::consoleThreadFun(void *data)
 
 	while (self->running)
 	{
-		/* Flush pending output */
+		bool needsRedraw = false;
+
+		/* Flush pending output from the queue (Debug(), _console_write) */
 		SDL_LockMutex(self->mutex);
 		bool hasOutput = !self->outputQueue.empty();
 
 		if (hasOutput)
 		{
-			/* Clear current prompt + input line */
 			rawWrite("\r\033[K");
 
 			while (!self->outputQueue.empty())
@@ -491,10 +510,41 @@ int ConsoleInput::consoleThreadFun(void *data)
 				rawWrite("\n");
 				self->outputQueue.pop();
 			}
+			needsRedraw = true;
 		}
 		SDL_UnlockMutex(self->mutex);
 
-		if (hasOutput)
+#ifndef __WIN32__
+		/* Drain any data from the stdout pipe (Ruby puts/print/p) */
+		if (stdoutPipe[0] >= 0)
+		{
+			char buf[4096];
+			ssize_t n;
+			bool pipedAny = false;
+			char lastChar = 0;
+
+			while ((n = read(stdoutPipe[0], buf, sizeof(buf))) > 0)
+			{
+				if (!pipedAny)
+				{
+					rawWrite("\r\033[K");
+					pipedAny = true;
+				}
+				rawWrite(buf, (size_t)n);
+				lastChar = buf[n - 1];
+			}
+
+			if (pipedAny)
+			{
+				/* Ensure we end on a fresh line for the prompt */
+				if (lastChar != '\n')
+					rawWrite("\n");
+				needsRedraw = true;
+			}
+		}
+#endif
+
+		if (needsRedraw)
 			self->redrawInput();
 
 		/* Wait for input */
@@ -511,14 +561,14 @@ int ConsoleInput::consoleThreadFun(void *data)
 		}
 		else if (c == 27)
 		{
-			if (!stdinReady(16))
+			if (!stdinReady(50))
 				continue;
 
 			char seq;
 			if (!stdinReadChar(seq) || seq != '[')
 				continue;
 
-			if (!stdinReady(16))
+			if (!stdinReady(50))
 				continue;
 
 			char code;
@@ -572,6 +622,15 @@ int ConsoleInput::consoleThreadFun(void *data)
 	}
 
 #ifndef __WIN32__
+	/* Restore stdout and close pipe */
+	if (savedStdout >= 0)
+	{
+		dup2(savedStdout, STDOUT_FILENO);
+		close(savedStdout);
+	}
+	if (stdoutPipe[0] >= 0)
+		close(stdoutPipe[0]);
+
 	if (self->rawModeSet)
 		tcsetattr(STDIN_FILENO, TCSANOW, &oldTerm);
 #endif
