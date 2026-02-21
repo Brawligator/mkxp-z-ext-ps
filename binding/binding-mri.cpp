@@ -79,6 +79,11 @@ static void mriBindingReset();
 
 static ConsoleInput *consoleInput = nullptr;
 
+#if RAPI_FULL >= 200
+static VALUE consoleCallerBinding = Qnil;
+RB_METHOD(mkxpCaptureBinding);
+#endif
+
 ScriptBinding scriptBindingImpl = {mriBindingExecute, mriBindingTerminate,
     mriBindingReset};
 
@@ -471,8 +476,6 @@ static VALUE captureCallerBindingCallback(const rb_debug_inspector_t *dc, void *
 
     return Qnil;
 }
-
-static VALUE consoleCallerBinding = Qnil;
 
 RB_METHOD(mkxpCaptureBinding) {
     RB_UNUSED_PARAM;
