@@ -328,8 +328,14 @@ void ConsoleInput::redrawInput()
 
 void ConsoleInput::submitLine()
 {
-	/* Finalize the command line: move cursor to end, advance
-	 * to next line.  The typed text stays in scrollback. */
+	/* Replace the current line with a syntax-highlighted copy,
+	 * then advance to the next line.  This is the ONE copy
+	 * of the command that remains in scrollback. */
+	rawWrite("\r\033[K");
+	rawWrite(CLR_PROMPT);
+	rawWrite(PROMPT, PROMPT_LEN);
+	rawWrite(CLR_RESET);
+	rawWrite(highlightRuby(inputLine));
 	rawWrite("\n");
 
 	if (!inputLine.empty())
@@ -347,7 +353,8 @@ void ConsoleInput::submitLine()
 	cursorPos = 0;
 	historyIndex = -1;
 	savedInput.clear();
-	redrawInput();
+	/* Don't call redrawInput() here — let the main loop
+	 * draw the prompt after flushing any pending output. */
 }
 
 void ConsoleInput::handleArrowKey(char code)
@@ -559,6 +566,33 @@ int ConsoleInput::consoleThreadFun(void *data)
 		if (c == '\n' || c == '\r')
 		{
 			self->submitLine();
+			/* Consume a trailing \n or \r so that terminals
+			 * sending \r\n don't trigger a double-submit. */
+			if (stdinReady(5))
+			{
+				char next;
+				if (stdinReadChar(next))
+				{
+					if (next != '\n' && next != '\r')
+					{
+						/* Not part of the Enter sequence —
+						 * treat it as normal input. */
+						if (next == 27)
+						{
+							/* Escape — would need special handling,
+							 * but unlikely right after Enter. Skip. */
+						}
+						else if (next == 127 || next == 8)
+							self->backspace();
+						else if (next >= 32)
+							self->insertChar(next);
+					}
+				}
+			}
+			/* Draw prompt immediately after submit so the user
+			 * sees it even before output arrives. */
+			self->redrawInput();
+			continue;
 		}
 		else if (c == 27)
 		{
