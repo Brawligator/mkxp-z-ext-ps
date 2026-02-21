@@ -327,9 +327,6 @@ void ConsoleInput::redrawInput()
 
 void ConsoleInput::submitLine()
 {
-	/* Move to the next line — typed text stays visible as scrollback */
-	rawWrite("\n");
-
 	if (!inputLine.empty())
 	{
 		if (history.empty() || history.back() != inputLine)
@@ -345,6 +342,9 @@ void ConsoleInput::submitLine()
 	cursorPos = 0;
 	historyIndex = -1;
 	savedInput.clear();
+
+	/* Stay on the same line — just redraw as empty prompt.
+	 * The output flush will overwrite this line with the result. */
 	redrawInput();
 }
 
@@ -498,7 +498,7 @@ int ConsoleInput::consoleThreadFun(void *data)
 			self->redrawInput();
 
 		/* Wait for input */
-		if (!stdinReady(50))
+		if (!stdinReady(16))
 			continue;
 
 		char c;
@@ -511,14 +511,14 @@ int ConsoleInput::consoleThreadFun(void *data)
 		}
 		else if (c == 27)
 		{
-			if (!stdinReady(50))
+			if (!stdinReady(16))
 				continue;
 
 			char seq;
 			if (!stdinReadChar(seq) || seq != '[')
 				continue;
 
-			if (!stdinReady(50))
+			if (!stdinReady(16))
 				continue;
 
 			char code;
