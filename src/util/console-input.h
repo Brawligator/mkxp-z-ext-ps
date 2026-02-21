@@ -26,13 +26,16 @@ public:
 private:
 	static int consoleThreadFun(void *data);
 
-	void flushOutput();
-
 	SDL_Thread *thread;
 	SDL_mutex *mutex;
 	std::queue<std::string> inputQueue;
 	std::queue<std::string> outputQueue;
+	std::string inputLine;
 	bool running;
+
+#ifndef __WIN32__
+	bool rawModeSet;
+#endif
 };
 
 /* When set, Debug() routes output here instead of stderr directly. */

@@ -1,6 +1,7 @@
 #include "console-input.h"
 
 #include <string>
+#include <cstring>
 
 #ifdef __WIN32__
 #include <io.h>
@@ -8,6 +9,7 @@
 #else
 #include <poll.h>
 #include <unistd.h>
+#include <termios.h>
 #endif
 
 void (*debugOutputHandler)(const std::string &line) = nullptr;
@@ -16,75 +18,32 @@ static void rawWrite(const char *str, size_t len)
 {
 #ifdef __WIN32__
 	DWORD written;
-	WriteFile(GetStdHandle(STD_ERROR_HANDLE), str, (DWORD)len, &written, NULL);
+	HANDLE h = GetStdHandle(STD_ERROR_HANDLE);
+	WriteFile(h, str, (DWORD)len, &written, NULL);
 #else
-	write(STDERR_FILENO, str, len);
-#endif
-}
-
-static void rawWrite(const char *str)
-{
-	rawWrite(str, strlen(str));
-}
-
-static void rawWriteLn(const std::string &line)
-{
-	rawWrite(line.c_str(), line.size());
-	rawWrite("\n", 1);
-}
-
-static void rawPrompt()
-{
-	rawWrite(">> ", 3);
-}
-
-/* Returns true if stdin has data ready, with a timeout in ms.
- * Returns false on timeout or error. */
-static bool stdinReady(int timeoutMs)
-{
-#ifdef __WIN32__
-	HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
-	DWORD result = WaitForSingleObject(h, timeoutMs);
-	return result == WAIT_OBJECT_0;
-#else
-	struct pollfd pfd;
-	pfd.fd = STDIN_FILENO;
-	pfd.events = POLLIN;
-	pfd.revents = 0;
-	int ret = poll(&pfd, 1, timeoutMs);
-	return ret > 0 && (pfd.revents & POLLIN);
-#endif
-}
-
-/* Read available bytes from stdin into buf.
- * Returns number of bytes read, 0 on EOF, -1 on error. */
-static int stdinRead(char *buf, int size)
-{
-#ifdef __WIN32__
-	HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
-	DWORD bytesRead = 0;
-
-	/* For console handles, use ReadConsoleA to get cooked input */
-	if (GetConsoleMode(h, &bytesRead))
+	ssize_t r;
+	while (len > 0)
 	{
-		if (!ReadConsoleA(h, buf, size, &bytesRead, NULL))
-			return -1;
-		return (int)bytesRead;
+		r = write(STDERR_FILENO, str, len);
+		if (r <= 0) break;
+		str += r;
+		len -= r;
 	}
-
-	/* For pipes/files, use ReadFile */
-	if (!ReadFile(h, buf, size, &bytesRead, NULL))
-		return -1;
-	return (int)bytesRead;
-#else
-	return (int)read(STDIN_FILENO, buf, size);
 #endif
+}
+
+static void rawWrite(const std::string &s)
+{
+	rawWrite(s.c_str(), s.size());
 }
 
 ConsoleInput::ConsoleInput()
     : thread(nullptr),
       mutex(SDL_CreateMutex()),
       running(false)
+#ifndef __WIN32__
+      , rawModeSet(false)
+#endif
 {}
 
 ConsoleInput::~ConsoleInput()
@@ -137,66 +96,137 @@ void ConsoleInput::writeLine(const std::string &line)
 	SDL_UnlockMutex(mutex);
 }
 
-void ConsoleInput::flushOutput()
-{
-	SDL_LockMutex(mutex);
-
-	while (!outputQueue.empty())
-	{
-		rawWriteLn(outputQueue.front());
-		outputQueue.pop();
-	}
-
-	SDL_UnlockMutex(mutex);
-}
-
 int ConsoleInput::consoleThreadFun(void *data)
 {
 	ConsoleInput *self = static_cast<ConsoleInput *>(data);
-	std::string lineBuffer;
 
-	rawPrompt();
+#ifndef __WIN32__
+	/* Put terminal in raw mode: no echo, non-canonical */
+	struct termios oldTerm, newTerm;
+
+	if (tcgetattr(STDIN_FILENO, &oldTerm) == 0)
+	{
+		newTerm = oldTerm;
+		newTerm.c_lflag &= ~((unsigned)ECHO | (unsigned)ICANON);
+		newTerm.c_cc[VMIN] = 0;
+		newTerm.c_cc[VTIME] = 0;
+		tcsetattr(STDIN_FILENO, TCSANOW, &newTerm);
+		self->rawModeSet = true;
+	}
+#endif
+
+	rawWrite(">> ");
 
 	while (self->running)
 	{
-		/* Flush any pending output */
-		self->flushOutput();
+		/* Flush pending output, clearing current input line first */
+		SDL_LockMutex(self->mutex);
+		bool hasOutput = !self->outputQueue.empty();
 
-		/* Poll stdin with a short timeout so we can
-		 * keep flushing output while waiting for input */
-		if (!stdinReady(50))
-			continue;
-
-		char buf[4096];
-		int n = stdinRead(buf, sizeof(buf) - 1);
-		if (n <= 0)
-			break;
-
-		lineBuffer.append(buf, n);
-
-		/* Extract complete lines */
-		size_t pos;
-		while ((pos = lineBuffer.find('\n')) != std::string::npos)
+		if (hasOutput)
 		{
-			std::string line = lineBuffer.substr(0, pos);
-			lineBuffer.erase(0, pos + 1);
+			/* Clear the current prompt + input */
+			rawWrite("\r\033[K");
 
-			/* Strip trailing \r */
-			if (!line.empty() && line.back() == '\r')
-				line.pop_back();
-
-			if (!line.empty())
+			while (!self->outputQueue.empty())
 			{
-				SDL_LockMutex(self->mutex);
-				self->inputQueue.push(line);
-				SDL_UnlockMutex(self->mutex);
-			}
-			else
-			{
-				rawPrompt();
+				rawWrite(self->outputQueue.front());
+				rawWrite("\n", 1);
+				self->outputQueue.pop();
 			}
 		}
+
+		SDL_UnlockMutex(self->mutex);
+
+		if (hasOutput)
+		{
+			/* Redraw prompt and current input buffer */
+			rawWrite(">> ");
+			SDL_LockMutex(self->mutex);
+			rawWrite(self->inputLine);
+			SDL_UnlockMutex(self->mutex);
+		}
+
+		/* Poll stdin for input */
+#ifdef __WIN32__
+		HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
+		DWORD result = WaitForSingleObject(h, 50);
+		if (result != WAIT_OBJECT_0)
+			continue;
+
+		INPUT_RECORD ir;
+		DWORD eventsRead;
+		if (!PeekConsoleInput(h, &ir, 1, &eventsRead) || eventsRead == 0)
+			continue;
+		if (!ReadConsoleInput(h, &ir, 1, &eventsRead))
+			continue;
+		if (ir.EventType != KEY_EVENT || !ir.Event.KeyEvent.bKeyDown)
+			continue;
+
+		char c = ir.Event.KeyEvent.uChar.AsciiChar;
+#else
+		struct pollfd pfd;
+		pfd.fd = STDIN_FILENO;
+		pfd.events = POLLIN;
+		pfd.revents = 0;
+
+		if (poll(&pfd, 1, 50) <= 0 || !(pfd.revents & POLLIN))
+			continue;
+
+		char c;
+		if (read(STDIN_FILENO, &c, 1) != 1)
+			break;
+#endif
+
+		if (c == '\n' || c == '\r')
+		{
+			rawWrite("\n", 1);
+
+			SDL_LockMutex(self->mutex);
+			if (!self->inputLine.empty())
+			{
+				self->inputQueue.push(self->inputLine);
+				self->inputLine.clear();
+			}
+			SDL_UnlockMutex(self->mutex);
+
+			rawWrite(">> ");
+		}
+		else if (c == 127 || c == 8)
+		{
+			/* Backspace */
+			SDL_LockMutex(self->mutex);
+			if (!self->inputLine.empty())
+			{
+				self->inputLine.pop_back();
+				rawWrite("\b \b", 3);
+			}
+			SDL_UnlockMutex(self->mutex);
+		}
+		else if (c == 3)
+		{
+			/* Ctrl+C: clear current input */
+			SDL_LockMutex(self->mutex);
+			rawWrite("\r\033[K");
+			self->inputLine.clear();
+			SDL_UnlockMutex(self->mutex);
+			rawWrite(">> ");
+		}
+		else if (c >= 32)
+		{
+			/* Printable character */
+			SDL_LockMutex(self->mutex);
+			self->inputLine += c;
+			SDL_UnlockMutex(self->mutex);
+			rawWrite(&c, 1);
+		}
 	}
+
+#ifndef __WIN32__
+	/* Restore terminal */
+	if (self->rawModeSet)
+		tcsetattr(STDIN_FILENO, TCSANOW, &oldTerm);
+#endif
 
 	return 0;
 }
