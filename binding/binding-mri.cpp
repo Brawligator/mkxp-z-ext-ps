@@ -50,6 +50,10 @@ extern "C" {
 #if RAPI_FULL >= 190
 #include <ruby/encoding.h>
 #endif
+
+#if RAPI_FULL >= 200
+#include <ruby/debug.h>
+#endif
 }
 
 #ifdef __WIN32__
@@ -232,6 +236,10 @@ static void mriBindingInit() {
     _rb_define_module_function(mod, "puts", mkxpPuts);
     _rb_define_module_function(mod, "_console_poll", mkxpConsolePoll);
     _rb_define_module_function(mod, "_console_write", mkxpConsoleWrite);
+#if RAPI_FULL >= 200
+    _rb_define_module_function(mod, "_capture_binding", mkxpCaptureBinding);
+    rb_gc_register_address(&consoleCallerBinding);
+#endif
     _rb_define_module_function(mod, "desensitize", mkxpDesensitize);
     _rb_define_module_function(mod, "platform", mkxpPlatform);
     
@@ -435,6 +443,49 @@ RB_METHOD(mkxpConsoleWrite) {
 
     return Qnil;
 }
+
+#if RAPI_FULL >= 200
+/* Walk the Ruby call stack and return the binding of the frame
+ * that called Graphics.update.  Called from MKXP_Console.process
+ * which is called from Graphics.update, so the layout is:
+ *   0 = _capture_binding  (this C method — no Ruby binding)
+ *   1 = MKXP_Console.process
+ *   2 = Graphics.update    (our Ruby wrapper)
+ *   3 = caller of Graphics.update  ← we want this one
+ * If the caller is a C frame (no binding), we search outward. */
+static VALUE captureCallerBindingCallback(const rb_debug_inspector_t *dc, void *ptr)
+{
+    VALUE *out = static_cast<VALUE *>(ptr);
+
+    /* Start at frame 3 and search outward for the first
+     * frame that has a Ruby binding (skip C frames). */
+    for (int i = 3; i <= 6; i++)
+    {
+        VALUE b = rb_debug_inspector_frame_binding_get(dc, i);
+        if (!NIL_P(b))
+        {
+            *out = b;
+            return Qnil;
+        }
+    }
+
+    return Qnil;
+}
+
+static VALUE consoleCallerBinding = Qnil;
+
+RB_METHOD(mkxpCaptureBinding) {
+    RB_UNUSED_PARAM;
+
+    VALUE binding = Qnil;
+    rb_debug_inspector_open(captureCallerBindingCallback, &binding);
+
+    if (!NIL_P(binding))
+        consoleCallerBinding = binding;
+
+    return consoleCallerBinding;
+}
+#endif
 
 RB_METHOD(mkxpPlatform) {
     RB_UNUSED_PARAM;
@@ -1333,24 +1384,17 @@ static void mriBindingExecute() {
 
         rb_eval_string(
             "module MKXP_Console\n"
-            "  @binding = TOPLEVEL_BINDING\n"
             "  @processing = false\n"
-            "  @gfx_sc = Graphics.singleton_class\n"
-            "\n"
-            "  @tp = TracePoint.new(:line) do |t|\n"
-            "    next if t.defined_class == @gfx_sc\n"
-            "    next if t.defined_class == MKXP_Console\n"
-            "    @binding = t.binding\n"
-            "    @tp.disable\n"
-            "  end\n"
             "\n"
             "  def self.process\n"
             "    return if @processing\n"
             "    @processing = true\n"
             "    begin\n"
+            "      b = System._capture_binding rescue nil\n"
+            "      b ||= TOPLEVEL_BINDING\n"
             "      while (cmd = System._console_poll)\n"
             "        begin\n"
-            "          result = eval(cmd, @binding, \"(console)\", 1)\n"
+            "          result = eval(cmd, b, \"(console)\", 1)\n"
             "          System._console_write(\"=> \" + result.inspect)\n"
             "        rescue Exception => e\n"
             "          System._console_write(e.class.to_s + \": \" + e.message)\n"
@@ -1361,10 +1405,6 @@ static void mriBindingExecute() {
             "      @processing = false\n"
             "    end\n"
             "  end\n"
-            "\n"
-            "  def self.capture_caller_binding\n"
-            "    @tp.enable unless @tp.enabled?\n"
-            "  end\n"
             "end\n"
             "\n"
             "class << Graphics\n"
@@ -1372,7 +1412,6 @@ static void mriBindingExecute() {
             "  def update\n"
             "    _mkxp_console_original_update\n"
             "    MKXP_Console.process\n"
-            "    MKXP_Console.capture_caller_binding\n"
             "  end\n"
             "end\n"
         );
@@ -1398,6 +1437,10 @@ static void mriBindingExecute() {
         consoleInput->stop();
         delete consoleInput;
         consoleInput = nullptr;
+#if RAPI_FULL >= 200
+        rb_gc_unregister_address(&consoleCallerBinding);
+        consoleCallerBinding = Qnil;
+#endif
     }
 
     ruby_cleanup(0);

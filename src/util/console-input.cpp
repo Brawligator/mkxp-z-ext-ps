@@ -327,8 +327,8 @@ void ConsoleInput::redrawInput()
 
 void ConsoleInput::submitLine()
 {
-	/* Advance to next line — typed text stays visible above */
-	rawWrite("\r\n");
+	/* Clear the typed text and move to the next line */
+	rawWrite("\r\033[K\n");
 
 	if (!inputLine.empty())
 	{
@@ -346,11 +346,9 @@ void ConsoleInput::submitLine()
 	historyIndex = -1;
 	savedInput.clear();
 
-	/* Don't redraw prompt here — the eval result will
-	 * flush through the output queue and redraw it.
-	 * For empty lines (no command queued), draw it now. */
-	if (inputQueue.empty())
-		redrawInput();
+	/* Always redraw the prompt immediately so the cursor
+	 * is visible while waiting for eval results. */
+	redrawInput();
 }
 
 void ConsoleInput::handleArrowKey(char code)
@@ -462,10 +460,10 @@ int ConsoleInput::consoleThreadFun(void *data)
 	if (tcgetattr(STDIN_FILENO, &oldTerm) == 0)
 	{
 		newTerm = oldTerm;
-		/* Disable echo, canonical mode, and output post-processing
-		 * so we have full control over what hits the terminal */
+		/* Disable echo and canonical mode so we get raw keypresses.
+		 * Keep OPOST enabled so \n from other writers (Ruby's puts)
+		 * gets translated to \r\n by the terminal driver. */
 		newTerm.c_lflag &= ~((unsigned)ECHO | (unsigned)ICANON);
-		newTerm.c_oflag &= ~(unsigned)OPOST;
 		newTerm.c_cc[VMIN] = 0;
 		newTerm.c_cc[VTIME] = 0;
 		tcsetattr(STDIN_FILENO, TCSANOW, &newTerm);
