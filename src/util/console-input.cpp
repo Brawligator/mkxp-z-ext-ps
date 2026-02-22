@@ -304,10 +304,6 @@ bool ConsoleInput::poll(std::string &out)
 
 void ConsoleInput::writeLine(const std::string &line, bool highlight)
 {
-	/* DBG */ rawWrite("\r\033[K[WL] ");
-	/* DBG */ rawWrite(line.substr(0, 60));
-	/* DBG */ rawWrite("\n");
-
 	SDL_LockMutex(mutex);
 	outputQueue.push({line, highlight});
 	SDL_UnlockMutex(mutex);
@@ -516,7 +512,20 @@ int ConsoleInput::consoleThreadFun(void *data)
 
 		/* Wait for input */
 		if (!stdinReady(16))
+		{
+			/* DBG: check queue from console thread only */
+			SDL_LockMutex(self->mutex);
+			size_t sz = self->outputQueue.size();
+			SDL_UnlockMutex(self->mutex);
+			if (sz > 0)
+			{
+				char dbg[64];
+				snprintf(dbg, sizeof(dbg),
+				         "\r\033[K[POLL: qsz=%zu]\n", sz);
+				rawWrite(dbg);
+			}
 			continue;
+		}
 
 		char c;
 		if (!stdinReadChar(c))
