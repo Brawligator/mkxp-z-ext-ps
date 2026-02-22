@@ -89,6 +89,7 @@ void tilemapBindingInit();
 void windowVXBindingInit();
 void tilemapVXBindingInit();
 void shaderBindingInit();
+void particleSystemBindingInit();
 
 void inputBindingInit();
 void audioBindingInit();
@@ -165,6 +166,7 @@ static void mriBindingInit() {
     viewportBindingInit();
     planeBindingInit();
     shaderBindingInit();
+    particleSystemBindingInit();
     
     if (rgssVer == 1) {
         windowBindingInit();
