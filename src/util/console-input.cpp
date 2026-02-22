@@ -304,6 +304,10 @@ bool ConsoleInput::poll(std::string &out)
 
 void ConsoleInput::writeLine(const std::string &line, bool highlight)
 {
+	/* DBG */ rawWrite("\r\033[K[WL] ");
+	/* DBG */ rawWrite(line.substr(0, 60));
+	/* DBG */ rawWrite("\n");
+
 	SDL_LockMutex(mutex);
 	outputQueue.push({line, highlight});
 	SDL_UnlockMutex(mutex);
@@ -318,6 +322,8 @@ bool ConsoleInput::flushPendingOutput()
 		SDL_UnlockMutex(mutex);
 		return false;
 	}
+
+	/* DBG */ rawWrite("\r\033[K[FPO] draining queue\n");
 
 	/* Erase the prompt line before writing output */
 	rawWrite("\r\033[K");
@@ -356,6 +362,10 @@ void ConsoleInput::redrawInput()
 
 void ConsoleInput::submitLine()
 {
+	/* DBG */ rawWrite("\r\033[K[SUB] \"");
+	/* DBG */ rawWrite(inputLine);
+	/* DBG */ rawWrite("\"\n");
+
 	rawWrite("\n");
 
 	if (!inputLine.empty())
