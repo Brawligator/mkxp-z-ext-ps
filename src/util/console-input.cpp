@@ -13,15 +13,9 @@
 #include <poll.h>
 #include <unistd.h>
 #include <termios.h>
-#include <fcntl.h>
 #endif
 
 void (*debugOutputHandler)(const std::string &line) = nullptr;
-
-/* File descriptor used for all console display output.
- * Initially stderr; replaced with a dup'd copy before
- * stderr is redirected to the capture pipe. */
-static int displayFd = STDERR_FILENO;
 
 static const char *PROMPT = ">> ";
 static const size_t PROMPT_LEN = 3;
@@ -192,8 +186,9 @@ static std::string highlightRuby(const std::string &src)
 
 /* --- Terminal I/O helpers --- */
 
-/* All terminal output goes through rawWrite to STDERR_FILENO.
- * OPOST is kept enabled so \n is translated to \r\n by the driver. */
+/* All console UI output goes through rawWrite to STDERR_FILENO.
+ * stdout is left alone so game printf/puts goes straight to the
+ * terminal without any pipe capture. */
 
 static void rawWrite(const char *str, size_t len)
 {
@@ -206,7 +201,7 @@ static void rawWrite(const char *str, size_t len)
 	ssize_t r;
 	while (len > 0)
 	{
-		r = write(displayFd, str, len);
+		r = write(STDERR_FILENO, str, len);
 		if (r <= 0) break;
 		str += r;
 		len -= r;
@@ -258,10 +253,7 @@ ConsoleInput::ConsoleInput()
       mutex(SDL_CreateMutex()),
       cursorPos(0),
       historyIndex(-1),
-      running(false),
-      stdoutPipeFd(-1),
-      savedStdout(-1),
-      savedStderr(-1)
+      running(false)
 #ifndef __WIN32__
       , rawModeSet(false)
 #endif
@@ -278,33 +270,6 @@ void ConsoleInput::start()
 	if (running)
 		return;
 
-#ifndef __WIN32__
-	/* Redirect stdout AND stderr through a capture pipe BEFORE
-	 * starting the console thread.  This must happen on the main
-	 * thread so the redirect is in place before any game scripts
-	 * run (eliminates a race with the console thread). */
-	int capturePipe[2] = {-1, -1};
-
-	/* Save the real stderr for display output */
-	int dfd = dup(STDERR_FILENO);
-	if (dfd >= 0)
-		displayFd = dfd;
-
-	if (pipe(capturePipe) == 0)
-	{
-		savedStdout = dup(STDOUT_FILENO);
-		savedStderr = dup(STDERR_FILENO);
-		dup2(capturePipe[1], STDOUT_FILENO);
-		dup2(capturePipe[1], STDERR_FILENO);
-		close(capturePipe[1]);
-		/* Make the read end non-blocking */
-		fcntl(capturePipe[0], F_SETFL, O_NONBLOCK);
-		/* Disable C-level buffering on the redirected stdout */
-		setvbuf(stdout, NULL, _IONBF, 0);
-		stdoutPipeFd = capturePipe[0];
-	}
-#endif
-
 	running = true;
 	thread = SDL_CreateThread(consoleThreadFun, "console", this);
 }
@@ -318,32 +283,6 @@ void ConsoleInput::stop()
 		SDL_WaitThread(thread, nullptr);
 		thread = nullptr;
 	}
-
-#ifndef __WIN32__
-	/* Restore stdout and stderr */
-	if (savedStdout >= 0)
-	{
-		dup2(savedStdout, STDOUT_FILENO);
-		close(savedStdout);
-		savedStdout = -1;
-	}
-	if (savedStderr >= 0)
-	{
-		dup2(savedStderr, STDERR_FILENO);
-		close(savedStderr);
-		savedStderr = -1;
-	}
-	if (stdoutPipeFd >= 0)
-	{
-		close(stdoutPipeFd);
-		stdoutPipeFd = -1;
-	}
-	if (displayFd >= 0 && displayFd != STDERR_FILENO)
-	{
-		close(displayFd);
-		displayFd = STDERR_FILENO;
-	}
-#endif
 }
 
 bool ConsoleInput::poll(std::string &out)
@@ -372,19 +311,19 @@ void ConsoleInput::writeLine(const std::string &line, bool highlight)
 
 bool ConsoleInput::flushPendingOutput()
 {
-	bool hadOutput = false;
-	bool promptErased = false;
-
-	/* Drain the output queue (Debug(), _console_write) */
 	SDL_LockMutex(mutex);
+
+	if (outputQueue.empty())
+	{
+		SDL_UnlockMutex(mutex);
+		return false;
+	}
+
+	/* Erase the prompt line before writing output */
+	rawWrite("\r\033[K");
 
 	while (!outputQueue.empty())
 	{
-		if (!promptErased)
-		{
-			rawWrite("\r\033[K");
-			promptErased = true;
-		}
 		auto &entry = outputQueue.front();
 		if (entry.second)
 			rawWrite(highlightRuby(entry.first));
@@ -392,37 +331,10 @@ bool ConsoleInput::flushPendingOutput()
 			rawWrite(entry.first);
 		rawWrite("\n");
 		outputQueue.pop();
-		hadOutput = true;
 	}
 
 	SDL_UnlockMutex(mutex);
-
-#ifndef __WIN32__
-	/* Drain any data from the stdout pipe (Ruby puts/print/p) */
-	if (stdoutPipeFd >= 0)
-	{
-		char buf[4096];
-		ssize_t n;
-		char lastChar = 0;
-
-		while ((n = read(stdoutPipeFd, buf, sizeof(buf))) > 0)
-		{
-			if (!promptErased)
-			{
-				rawWrite("\r\033[K");
-				promptErased = true;
-			}
-			rawWrite(buf, (size_t)n);
-			lastChar = buf[n - 1];
-			hadOutput = true;
-		}
-
-		if (hadOutput && lastChar != 0 && lastChar != '\n')
-			rawWrite("\n");
-	}
-#endif
-
-	return hadOutput;
+	return true;
 }
 
 void ConsoleInput::redrawInput()
@@ -431,8 +343,7 @@ void ConsoleInput::redrawInput()
 	rawWrite(CLR_PROMPT);
 	rawWrite(PROMPT, PROMPT_LEN);
 	rawWrite(CLR_RESET);
-	if (!inputLine.empty())
-		rawWrite(highlightRuby(inputLine));
+	rawWrite(inputLine);
 
 	int back = (int)inputLine.size() - (int)cursorPos;
 	if (back > 0)
@@ -576,7 +487,7 @@ int ConsoleInput::consoleThreadFun(void *data)
 	{
 		newTerm = oldTerm;
 		/* Disable echo and canonical mode so we get raw keypresses.
-		 * Keep OPOST enabled so \n is translated to \r\n. */
+		 * Keep OPOST enabled so \n is translated to \r\n by the driver. */
 		newTerm.c_lflag &= ~((unsigned)ECHO | (unsigned)ICANON);
 		newTerm.c_cc[VMIN] = 0;
 		newTerm.c_cc[VTIME] = 0;
@@ -589,8 +500,7 @@ int ConsoleInput::consoleThreadFun(void *data)
 
 	while (self->running)
 	{
-		/* Check for pending output.  If any arrived, erase the
-		 * current prompt, write the output, then redraw. */
+		/* If output arrived, display it and redraw the prompt */
 		if (self->flushPendingOutput())
 			self->redrawInput();
 
