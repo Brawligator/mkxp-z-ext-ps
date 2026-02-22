@@ -251,6 +251,7 @@ static bool stdinReadChar(char &c)
 ConsoleInput::ConsoleInput()
     : thread(nullptr),
       mutex(SDL_CreateMutex()),
+      needsRedraw(false),
       cursorPos(0),
       historyIndex(-1),
       running(false)
@@ -304,37 +305,20 @@ bool ConsoleInput::poll(std::string &out)
 
 void ConsoleInput::writeLine(const std::string &line, bool highlight)
 {
+	/* Write directly to the terminal from whatever thread calls us.
+	 * Build the whole line into one buffer so a single write() is
+	 * as close to atomic as we can get. */
+	std::string buf = "\r\033[K";
+	if (highlight)
+		buf += highlightRuby(line);
+	else
+		buf += line;
+	buf += "\n";
+	rawWrite(buf);
+
 	SDL_LockMutex(mutex);
-	outputQueue.push({line, highlight});
+	needsRedraw = true;
 	SDL_UnlockMutex(mutex);
-}
-
-bool ConsoleInput::flushPendingOutput()
-{
-	SDL_LockMutex(mutex);
-
-	if (outputQueue.empty())
-	{
-		SDL_UnlockMutex(mutex);
-		return false;
-	}
-
-	/* Erase the prompt line before writing output */
-	rawWrite("\r\033[K");
-
-	while (!outputQueue.empty())
-	{
-		auto &entry = outputQueue.front();
-		if (entry.second)
-			rawWrite(highlightRuby(entry.first));
-		else
-			rawWrite(entry.first);
-		rawWrite("\n");
-		outputQueue.pop();
-	}
-
-	SDL_UnlockMutex(mutex);
-	return true;
 }
 
 void ConsoleInput::redrawInput()
@@ -489,7 +473,7 @@ int ConsoleInput::consoleThreadFun(void *data)
 		/* Disable echo and canonical mode so we get raw keypresses.
 		 * Keep OPOST enabled so \n is translated to \r\n by the driver. */
 		newTerm.c_lflag &= ~((unsigned)ECHO | (unsigned)ICANON);
-		newTerm.c_cc[VMIN] = 1;
+		newTerm.c_cc[VMIN] = 0;
 		newTerm.c_cc[VTIME] = 0;
 		tcsetattr(STDIN_FILENO, TCSANOW, &newTerm);
 		self->rawModeSet = true;
@@ -500,8 +484,13 @@ int ConsoleInput::consoleThreadFun(void *data)
 
 	while (self->running)
 	{
-		/* If output arrived, display it and redraw the prompt */
-		if (self->flushPendingOutput())
+		/* If writeLine fired from another thread, redraw the prompt
+		 * so it appears below the new output. */
+		SDL_LockMutex(self->mutex);
+		bool redraw = self->needsRedraw;
+		self->needsRedraw = false;
+		SDL_UnlockMutex(self->mutex);
+		if (redraw)
 			self->redrawInput();
 
 		/* Wait for input */

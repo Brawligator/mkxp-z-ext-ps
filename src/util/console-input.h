@@ -20,14 +20,13 @@ public:
 	/* Returns the next queued command from the user, or false if none */
 	bool poll(std::string &out);
 
-	/* Queue a line for the console thread to print.
+	/* Write a line to the console immediately.
 	 * highlight: apply Ruby syntax highlighting when printing. */
 	void writeLine(const std::string &line, bool highlight = false);
 
 private:
 	static int consoleThreadFun(void *data);
 
-	bool flushPendingOutput();
 	void redrawInput();
 	void submitLine();
 	void handleArrowKey(char code);
@@ -38,8 +37,8 @@ private:
 	SDL_Thread *thread;
 	SDL_mutex *mutex;
 
-	std::queue<std::pair<std::string, bool>> outputQueue;
 	std::queue<std::string> inputQueue;
+	bool needsRedraw;
 
 	std::string inputLine;
 	size_t cursorPos;
