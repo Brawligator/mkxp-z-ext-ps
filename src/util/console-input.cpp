@@ -431,7 +431,8 @@ void ConsoleInput::redrawInput()
 	rawWrite(CLR_PROMPT);
 	rawWrite(PROMPT, PROMPT_LEN);
 	rawWrite(CLR_RESET);
-	rawWrite(inputLine);
+	if (!inputLine.empty())
+		rawWrite(highlightRuby(inputLine));
 
 	int back = (int)inputLine.size() - (int)cursorPos;
 	if (back > 0)
