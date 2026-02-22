@@ -1415,6 +1415,7 @@ static void mriBindingExecute() {
             "end\n"
             "\n"
             "$stdout.sync = true\n"
+            "$stderr.sync = true\n"
         );
     }
 

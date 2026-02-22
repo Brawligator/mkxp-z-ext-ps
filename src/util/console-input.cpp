@@ -18,6 +18,11 @@
 
 void (*debugOutputHandler)(const std::string &line) = nullptr;
 
+/* File descriptor used for all console display output.
+ * Initially stderr; replaced with a dup'd copy before
+ * stderr is redirected to the capture pipe. */
+static int displayFd = STDERR_FILENO;
+
 static const char *PROMPT = ">> ";
 static const size_t PROMPT_LEN = 3;
 
@@ -201,7 +206,7 @@ static void rawWrite(const char *str, size_t len)
 	ssize_t r;
 	while (len > 0)
 	{
-		r = write(STDERR_FILENO, str, len);
+		r = write(displayFd, str, len);
 		if (r <= 0) break;
 		str += r;
 		len -= r;
@@ -254,7 +259,9 @@ ConsoleInput::ConsoleInput()
       cursorPos(0),
       historyIndex(-1),
       running(false),
-      stdoutPipeFd(-1)
+      stdoutPipeFd(-1),
+      savedStdout(-1),
+      savedStderr(-1)
 #ifndef __WIN32__
       , rawModeSet(false)
 #endif
@@ -271,6 +278,33 @@ void ConsoleInput::start()
 	if (running)
 		return;
 
+#ifndef __WIN32__
+	/* Redirect stdout AND stderr through a capture pipe BEFORE
+	 * starting the console thread.  This must happen on the main
+	 * thread so the redirect is in place before any game scripts
+	 * run (eliminates a race with the console thread). */
+	int capturePipe[2] = {-1, -1};
+
+	/* Save the real stderr for display output */
+	int dfd = dup(STDERR_FILENO);
+	if (dfd >= 0)
+		displayFd = dfd;
+
+	if (pipe(capturePipe) == 0)
+	{
+		savedStdout = dup(STDOUT_FILENO);
+		savedStderr = dup(STDERR_FILENO);
+		dup2(capturePipe[1], STDOUT_FILENO);
+		dup2(capturePipe[1], STDERR_FILENO);
+		close(capturePipe[1]);
+		/* Make the read end non-blocking */
+		fcntl(capturePipe[0], F_SETFL, O_NONBLOCK);
+		/* Disable C-level buffering on the redirected stdout */
+		setvbuf(stdout, NULL, _IONBF, 0);
+		stdoutPipeFd = capturePipe[0];
+	}
+#endif
+
 	running = true;
 	thread = SDL_CreateThread(consoleThreadFun, "console", this);
 }
@@ -281,9 +315,35 @@ void ConsoleInput::stop()
 
 	if (thread)
 	{
-		SDL_DetachThread(thread);
+		SDL_WaitThread(thread, nullptr);
 		thread = nullptr;
 	}
+
+#ifndef __WIN32__
+	/* Restore stdout and stderr */
+	if (savedStdout >= 0)
+	{
+		dup2(savedStdout, STDOUT_FILENO);
+		close(savedStdout);
+		savedStdout = -1;
+	}
+	if (savedStderr >= 0)
+	{
+		dup2(savedStderr, STDERR_FILENO);
+		close(savedStderr);
+		savedStderr = -1;
+	}
+	if (stdoutPipeFd >= 0)
+	{
+		close(stdoutPipeFd);
+		stdoutPipeFd = -1;
+	}
+	if (displayFd >= 0 && displayFd != STDERR_FILENO)
+	{
+		close(displayFd);
+		displayFd = STDERR_FILENO;
+	}
+#endif
 }
 
 bool ConsoleInput::poll(std::string &out)
@@ -515,25 +575,6 @@ int ConsoleInput::consoleThreadFun(void *data)
 		tcsetattr(STDIN_FILENO, TCSANOW, &newTerm);
 		self->rawModeSet = true;
 	}
-
-	/* Redirect stdout through a pipe so ALL Ruby output
-	 * (puts, print, p, etc.) is captured by this thread
-	 * instead of writing to the terminal unsynchronized. */
-	int stdoutPipe[2] = {-1, -1};
-	int savedStdout = -1;
-
-	if (pipe(stdoutPipe) == 0)
-	{
-		savedStdout = dup(STDOUT_FILENO);
-		dup2(stdoutPipe[1], STDOUT_FILENO);
-		close(stdoutPipe[1]);
-		stdoutPipe[1] = -1;
-		/* Make the read end non-blocking */
-		fcntl(stdoutPipe[0], F_SETFL, O_NONBLOCK);
-		/* Disable C-level buffering on the redirected stdout */
-		setvbuf(stdout, NULL, _IONBF, 0);
-		self->stdoutPipeFd = stdoutPipe[0];
-	}
 #endif
 
 	self->redrawInput();
@@ -637,16 +678,6 @@ int ConsoleInput::consoleThreadFun(void *data)
 	}
 
 #ifndef __WIN32__
-	/* Restore stdout and close pipe */
-	self->stdoutPipeFd = -1;
-	if (savedStdout >= 0)
-	{
-		dup2(savedStdout, STDOUT_FILENO);
-		close(savedStdout);
-	}
-	if (stdoutPipe[0] >= 0)
-		close(stdoutPipe[0]);
-
 	if (self->rawModeSet)
 		tcsetattr(STDIN_FILENO, TCSANOW, &oldTerm);
 #endif

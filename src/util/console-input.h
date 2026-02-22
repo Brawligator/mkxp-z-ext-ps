@@ -50,6 +50,8 @@ private:
 
 	bool running;
 	int stdoutPipeFd;
+	int savedStdout;
+	int savedStderr;
 
 #ifndef __WIN32__
 	bool rawModeSet;
