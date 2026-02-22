@@ -319,8 +319,6 @@ bool ConsoleInput::flushPendingOutput()
 		return false;
 	}
 
-	/* DBG */ rawWrite("\r\033[K[FPO] draining queue\n");
-
 	/* Erase the prompt line before writing output */
 	rawWrite("\r\033[K");
 
@@ -358,10 +356,6 @@ void ConsoleInput::redrawInput()
 
 void ConsoleInput::submitLine()
 {
-	/* DBG */ rawWrite("\r\033[K[SUB] \"");
-	/* DBG */ rawWrite(inputLine);
-	/* DBG */ rawWrite("\"\n");
-
 	rawWrite("\n");
 
 	if (!inputLine.empty())
@@ -495,7 +489,7 @@ int ConsoleInput::consoleThreadFun(void *data)
 		/* Disable echo and canonical mode so we get raw keypresses.
 		 * Keep OPOST enabled so \n is translated to \r\n by the driver. */
 		newTerm.c_lflag &= ~((unsigned)ECHO | (unsigned)ICANON);
-		newTerm.c_cc[VMIN] = 0;
+		newTerm.c_cc[VMIN] = 1;
 		newTerm.c_cc[VTIME] = 0;
 		tcsetattr(STDIN_FILENO, TCSANOW, &newTerm);
 		self->rawModeSet = true;
@@ -512,24 +506,11 @@ int ConsoleInput::consoleThreadFun(void *data)
 
 		/* Wait for input */
 		if (!stdinReady(16))
-		{
-			/* DBG: check queue from console thread only */
-			SDL_LockMutex(self->mutex);
-			size_t sz = self->outputQueue.size();
-			SDL_UnlockMutex(self->mutex);
-			if (sz > 0)
-			{
-				char dbg[64];
-				snprintf(dbg, sizeof(dbg),
-				         "\r\033[K[POLL: qsz=%zu]\n", sz);
-				rawWrite(dbg);
-			}
 			continue;
-		}
 
 		char c;
 		if (!stdinReadChar(c))
-			break;
+			continue;
 
 		if (c == '\n' || c == '\r')
 		{
