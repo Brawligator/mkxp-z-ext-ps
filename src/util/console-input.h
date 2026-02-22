@@ -27,7 +27,7 @@ public:
 private:
 	static int consoleThreadFun(void *data);
 
-	void flushPendingOutput();
+	bool flushPendingOutput();
 	void redrawInput();
 	void submitLine();
 	void handleArrowKey(char code);

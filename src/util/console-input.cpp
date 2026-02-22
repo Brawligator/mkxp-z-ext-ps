@@ -370,14 +370,21 @@ void ConsoleInput::writeLine(const std::string &line, bool highlight)
 	SDL_UnlockMutex(mutex);
 }
 
-void ConsoleInput::flushPendingOutput()
+bool ConsoleInput::flushPendingOutput()
 {
+	bool hadOutput = false;
+	bool promptErased = false;
+
 	/* Drain the output queue (Debug(), _console_write) */
 	SDL_LockMutex(mutex);
 
 	while (!outputQueue.empty())
 	{
-		rawWrite("\r\033[K");
+		if (!promptErased)
+		{
+			rawWrite("\r\033[K");
+			promptErased = true;
+		}
 		auto &entry = outputQueue.front();
 		if (entry.second)
 			rawWrite(highlightRuby(entry.first));
@@ -385,6 +392,7 @@ void ConsoleInput::flushPendingOutput()
 			rawWrite(entry.first);
 		rawWrite("\n");
 		outputQueue.pop();
+		hadOutput = true;
 	}
 
 	SDL_UnlockMutex(mutex);
@@ -396,29 +404,29 @@ void ConsoleInput::flushPendingOutput()
 		char buf[4096];
 		ssize_t n;
 		char lastChar = 0;
-		bool pipedAny = false;
 
 		while ((n = read(stdoutPipeFd, buf, sizeof(buf))) > 0)
 		{
-			if (!pipedAny)
+			if (!promptErased)
 			{
 				rawWrite("\r\033[K");
-				pipedAny = true;
+				promptErased = true;
 			}
 			rawWrite(buf, (size_t)n);
 			lastChar = buf[n - 1];
+			hadOutput = true;
 		}
 
-		if (pipedAny && lastChar != '\n')
+		if (hadOutput && lastChar != 0 && lastChar != '\n')
 			rawWrite("\n");
 	}
 #endif
+
+	return hadOutput;
 }
 
 void ConsoleInput::redrawInput()
 {
-	flushPendingOutput();
-
 	rawWrite("\r\033[K");
 	rawWrite(CLR_PROMPT);
 	rawWrite(PROMPT, PROMPT_LEN);
@@ -436,9 +444,6 @@ void ConsoleInput::redrawInput()
 
 void ConsoleInput::submitLine()
 {
-	/* The current line already shows the highlighted command
-	 * (drawn by redrawInput during typing).  Just advance to
-	 * the next line, leaving that single copy in scrollback. */
 	rawWrite("\n");
 
 	if (!inputLine.empty())
@@ -456,6 +461,8 @@ void ConsoleInput::submitLine()
 	cursorPos = 0;
 	historyIndex = -1;
 	savedInput.clear();
+
+	redrawInput();
 }
 
 void ConsoleInput::handleArrowKey(char code)
@@ -581,10 +588,10 @@ int ConsoleInput::consoleThreadFun(void *data)
 
 	while (self->running)
 	{
-		/* redrawInput() internally flushes pending output
-		 * (queue + pipe) before drawing, so the prompt is
-		 * always positioned after all output. */
-		self->redrawInput();
+		/* Check for pending output.  If any arrived, erase the
+		 * current prompt, write the output, then redraw. */
+		if (self->flushPendingOutput())
+			self->redrawInput();
 
 		/* Wait for input */
 		if (!stdinReady(16))
