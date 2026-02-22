@@ -315,7 +315,7 @@ void ConsoleInput::redrawInput()
 	rawWrite(CLR_PROMPT);
 	rawWrite(PROMPT, PROMPT_LEN);
 	rawWrite(CLR_RESET);
-	rawWrite(highlightRuby(inputLine));
+	rawWrite(inputLine);
 
 	int back = (int)inputLine.size() - (int)cursorPos;
 	if (back > 0)
@@ -356,18 +356,12 @@ void ConsoleInput::handleArrowKey(char code)
 	{
 	case 'D':
 		if (cursorPos > 0)
-		{
 			cursorPos--;
-			redrawInput();
-		}
 		break;
 
 	case 'C':
 		if (cursorPos < inputLine.size())
-		{
 			cursorPos++;
-			redrawInput();
-		}
 		break;
 
 	case 'A':
@@ -391,7 +385,6 @@ void ConsoleInput::handleArrowKey(char code)
 
 		inputLine = history[historyIndex];
 		cursorPos = inputLine.size();
-		redrawInput();
 		break;
 	}
 
@@ -413,7 +406,6 @@ void ConsoleInput::handleArrowKey(char code)
 		}
 
 		cursorPos = inputLine.size();
-		redrawInput();
 		break;
 	}
 	}
@@ -427,7 +419,6 @@ void ConsoleInput::insertChar(char c)
 		inputLine.insert(cursorPos, 1, c);
 
 	cursorPos++;
-	redrawInput();
 }
 
 void ConsoleInput::backspace()
@@ -437,7 +428,6 @@ void ConsoleInput::backspace()
 
 	inputLine.erase(cursorPos - 1, 1);
 	cursorPos--;
-	redrawInput();
 }
 
 void ConsoleInput::deleteAtCursor()
@@ -446,7 +436,6 @@ void ConsoleInput::deleteAtCursor()
 		return;
 
 	inputLine.erase(cursorPos, 1);
-	redrawInput();
 }
 
 int ConsoleInput::consoleThreadFun(void *data)
@@ -602,12 +591,10 @@ int ConsoleInput::consoleThreadFun(void *data)
 		else if (c == 1)
 		{
 			self->cursorPos = 0;
-			self->redrawInput();
 		}
 		else if (c == 5)
 		{
 			self->cursorPos = self->inputLine.size();
-			self->redrawInput();
 		}
 		else if (c == 3)
 		{
@@ -615,13 +602,11 @@ int ConsoleInput::consoleThreadFun(void *data)
 			self->cursorPos = 0;
 			self->historyIndex = -1;
 			self->savedInput.clear();
-			self->redrawInput();
 		}
 		else if (c == 21)
 		{
 			self->inputLine.erase(0, self->cursorPos);
 			self->cursorPos = 0;
-			self->redrawInput();
 		}
 		else if (c >= 32)
 		{
