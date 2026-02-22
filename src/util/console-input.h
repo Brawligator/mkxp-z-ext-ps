@@ -27,6 +27,7 @@ public:
 private:
 	static int consoleThreadFun(void *data);
 
+	void flushPendingOutput();
 	void redrawInput();
 	void submitLine();
 	void handleArrowKey(char code);
@@ -48,6 +49,7 @@ private:
 	std::string savedInput;
 
 	bool running;
+	int stdoutPipeFd;
 
 #ifndef __WIN32__
 	bool rawModeSet;

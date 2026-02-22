@@ -253,7 +253,8 @@ ConsoleInput::ConsoleInput()
       mutex(SDL_CreateMutex()),
       cursorPos(0),
       historyIndex(-1),
-      running(false)
+      running(false),
+      stdoutPipeFd(-1)
 #ifndef __WIN32__
       , rawModeSet(false)
 #endif
@@ -309,8 +310,55 @@ void ConsoleInput::writeLine(const std::string &line, bool highlight)
 	SDL_UnlockMutex(mutex);
 }
 
+void ConsoleInput::flushPendingOutput()
+{
+	/* Drain the output queue (Debug(), _console_write) */
+	SDL_LockMutex(mutex);
+
+	while (!outputQueue.empty())
+	{
+		rawWrite("\r\033[K");
+		auto &entry = outputQueue.front();
+		if (entry.second)
+			rawWrite(highlightRuby(entry.first));
+		else
+			rawWrite(entry.first);
+		rawWrite("\n");
+		outputQueue.pop();
+	}
+
+	SDL_UnlockMutex(mutex);
+
+#ifndef __WIN32__
+	/* Drain any data from the stdout pipe (Ruby puts/print/p) */
+	if (stdoutPipeFd >= 0)
+	{
+		char buf[4096];
+		ssize_t n;
+		char lastChar = 0;
+		bool pipedAny = false;
+
+		while ((n = read(stdoutPipeFd, buf, sizeof(buf))) > 0)
+		{
+			if (!pipedAny)
+			{
+				rawWrite("\r\033[K");
+				pipedAny = true;
+			}
+			rawWrite(buf, (size_t)n);
+			lastChar = buf[n - 1];
+		}
+
+		if (pipedAny && lastChar != '\n')
+			rawWrite("\n");
+	}
+#endif
+}
+
 void ConsoleInput::redrawInput()
 {
+	flushPendingOutput();
+
 	rawWrite("\r\033[K");
 	rawWrite(CLR_PROMPT);
 	rawWrite(PROMPT, PROMPT_LEN);
@@ -356,12 +404,18 @@ void ConsoleInput::handleArrowKey(char code)
 	{
 	case 'D':
 		if (cursorPos > 0)
+		{
 			cursorPos--;
+			redrawInput();
+		}
 		break;
 
 	case 'C':
 		if (cursorPos < inputLine.size())
+		{
 			cursorPos++;
+			redrawInput();
+		}
 		break;
 
 	case 'A':
@@ -385,6 +439,7 @@ void ConsoleInput::handleArrowKey(char code)
 
 		inputLine = history[historyIndex];
 		cursorPos = inputLine.size();
+		redrawInput();
 		break;
 	}
 
@@ -406,6 +461,7 @@ void ConsoleInput::handleArrowKey(char code)
 		}
 
 		cursorPos = inputLine.size();
+		redrawInput();
 		break;
 	}
 	}
@@ -419,6 +475,7 @@ void ConsoleInput::insertChar(char c)
 		inputLine.insert(cursorPos, 1, c);
 
 	cursorPos++;
+	redrawInput();
 }
 
 void ConsoleInput::backspace()
@@ -428,6 +485,7 @@ void ConsoleInput::backspace()
 
 	inputLine.erase(cursorPos - 1, 1);
 	cursorPos--;
+	redrawInput();
 }
 
 void ConsoleInput::deleteAtCursor()
@@ -436,6 +494,7 @@ void ConsoleInput::deleteAtCursor()
 		return;
 
 	inputLine.erase(cursorPos, 1);
+	redrawInput();
 }
 
 int ConsoleInput::consoleThreadFun(void *data)
@@ -473,6 +532,7 @@ int ConsoleInput::consoleThreadFun(void *data)
 		fcntl(stdoutPipe[0], F_SETFL, O_NONBLOCK);
 		/* Disable C-level buffering on the redirected stdout */
 		setvbuf(stdout, NULL, _IONBF, 0);
+		self->stdoutPipeFd = stdoutPipe[0];
 	}
 #endif
 
@@ -480,51 +540,9 @@ int ConsoleInput::consoleThreadFun(void *data)
 
 	while (self->running)
 	{
-		/* Flush pending output from the queue (Debug(), _console_write) */
-		SDL_LockMutex(self->mutex);
-
-		while (!self->outputQueue.empty())
-		{
-			rawWrite("\r\033[K");
-			auto &entry = self->outputQueue.front();
-			if (entry.second)
-				rawWrite(highlightRuby(entry.first));
-			else
-				rawWrite(entry.first);
-			rawWrite("\n");
-			self->outputQueue.pop();
-		}
-
-		SDL_UnlockMutex(self->mutex);
-
-#ifndef __WIN32__
-		/* Drain any data from the stdout pipe (Ruby puts/print/p) */
-		if (stdoutPipe[0] >= 0)
-		{
-			char buf[4096];
-			ssize_t n;
-			char lastChar = 0;
-			bool pipedAny = false;
-
-			while ((n = read(stdoutPipe[0], buf, sizeof(buf))) > 0)
-			{
-				if (!pipedAny)
-				{
-					rawWrite("\r\033[K");
-					pipedAny = true;
-				}
-				rawWrite(buf, (size_t)n);
-				lastChar = buf[n - 1];
-			}
-
-			if (pipedAny && lastChar != '\n')
-				rawWrite("\n");
-		}
-#endif
-
-		/* Always redraw the prompt.  redrawInput() starts with
-		 * \r\033[K so calling it every iteration is idempotent
-		 * when nothing changed — it just refreshes the same line. */
+		/* redrawInput() internally flushes pending output
+		 * (queue + pipe) before drawing, so the prompt is
+		 * always positioned after all output. */
 		self->redrawInput();
 
 		/* Wait for input */
@@ -591,10 +609,12 @@ int ConsoleInput::consoleThreadFun(void *data)
 		else if (c == 1)
 		{
 			self->cursorPos = 0;
+			self->redrawInput();
 		}
 		else if (c == 5)
 		{
 			self->cursorPos = self->inputLine.size();
+			self->redrawInput();
 		}
 		else if (c == 3)
 		{
@@ -602,11 +622,13 @@ int ConsoleInput::consoleThreadFun(void *data)
 			self->cursorPos = 0;
 			self->historyIndex = -1;
 			self->savedInput.clear();
+			self->redrawInput();
 		}
 		else if (c == 21)
 		{
 			self->inputLine.erase(0, self->cursorPos);
 			self->cursorPos = 0;
+			self->redrawInput();
 		}
 		else if (c >= 32)
 		{
@@ -616,6 +638,7 @@ int ConsoleInput::consoleThreadFun(void *data)
 
 #ifndef __WIN32__
 	/* Restore stdout and close pipe */
+	self->stdoutPipeFd = -1;
 	if (savedStdout >= 0)
 	{
 		dup2(savedStdout, STDOUT_FILENO);
