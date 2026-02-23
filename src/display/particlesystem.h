@@ -28,6 +28,7 @@
 #include <utility>
 #include "util/disposable.h"
 #include "util.h"
+#include "etc-internal.h"
 
 class Sprite;
 class Bitmap;

@@ -30,6 +30,7 @@
 #include <cmath>
 #include <random>
 #include <cstring>
+#include "etc-internal.h"
 
 static std::mt19937 g_rng;
 

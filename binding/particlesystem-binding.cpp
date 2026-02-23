@@ -27,6 +27,7 @@
 #include "display/bitmap.h"
 #include "display/viewport.h"
 #include <vector>
+#include "etc-internal.h"
 
 #if RAPI_FULL > 187
 DEF_TYPE_CUSTOMNAME(ParticleSystem, "ParticleSystem");
