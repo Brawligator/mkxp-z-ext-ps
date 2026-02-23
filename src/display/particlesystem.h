@@ -29,8 +29,8 @@
 #include "util/disposable.h"
 #include "util.h"
 #include "etc-internal.h"
+#include "sprite.h"
 
-class Sprite;
 class Bitmap;
 class Viewport;
 
