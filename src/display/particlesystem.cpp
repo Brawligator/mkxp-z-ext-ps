@@ -84,29 +84,6 @@ ParticleSystem::~ParticleSystem() {
 	dispose();
 }
 
-void ParticleSystem::setParameters(int maxParticles, int hue, float slowdown,
-                                   float xgravity, float ygravity, float xoffset, float yoffset,
-                                   int opacityVar, const std::vector<std::string> &filenames,
-                                   int opacity, int zOffset, int hueVar, 
-                                   int sizeVar, bool fadesize) {
-	m_maxParticles = maxParticles;
-	m_hue = hue;
-	m_slowdown = slowdown;
-	m_xgravity = xgravity;
-	m_ygravity = ygravity;
-	m_xoffset = xoffset;
-	m_yoffset = yoffset;
-	m_opacityVar = opacityVar;
-	m_hueVar = hueVar;
-	m_sizeVar = sizeVar;
-	m_fadesize = fadesize;
-	m_initialOpacity = opacity;
-	m_zoffset = zOffset;
-	m_filenames = filenames;
-
-	initParticles(filenames, opacity, zOffset);
-}
-
 Bitmap *ParticleSystem::loadBitmap(const std::string &filename, int hue) {
 	BitmapKey key(filename, hue);
 	auto it = m_bitmaps.find(key);
@@ -114,12 +91,10 @@ Bitmap *ParticleSystem::loadBitmap(const std::string &filename, int hue) {
 	if (it != m_bitmaps.end() && it->second && !it->second->isDisposed()) {
 		return it->second;
 	}
-
-	// Load bitmap
-	std::string fullPath = filename;
 	
 	try {
-		Bitmap *bitmap = new Bitmap(fullPath.c_str());
+		Bitmap *bitmap = new Bitmap(filename.c_str());
+		bitmap->hueChange(hue);
 		m_bitmaps[key] = bitmap;
 		return bitmap;
 	} catch (const std::exception &e) {
@@ -165,7 +140,9 @@ void ParticleSystem::buildParticleSpaces() {
 	m_outlineSpace = m_innerSpace;
 }
 
-void ParticleSystem::initParticles(const std::vector<std::string> &filenames, int opacity, int zOffset) {
+void ParticleSystem::refresh() {
+	int zOffset = m_zoffset;
+
 	// Clean up existing particles
 	for (auto sprite : m_particles) {
 		if (sprite) {
@@ -188,7 +165,7 @@ void ParticleSystem::initParticles(const std::vector<std::string> &filenames, in
 	m_bmwidth = 32;
 	m_bmheight = 32;
 
-	double innerThreshold = m_maxParticles * 0.89;
+	double innerThreshold = m_maxParticles * 0.9;
 
 	for (int i = 0; i < m_maxParticles; ++i) {
 		bool useInner = i >= innerThreshold;
@@ -202,8 +179,8 @@ void ParticleSystem::initParticles(const std::vector<std::string> &filenames, in
 		Sprite *particle = new Sprite(m_viewport);
 		m_particles.push_back(particle);
 
-		if (!filenames.empty()) {
-			const std::string &filename = filenames[randomInt(filenames.size())];
+		if (!m_filenames.empty()) {
+			const std::string &filename = m_filenames[randomInt(m_filenames.size())];
 			int particleHue = m_hue + randomFloatRange(-m_hueVar, m_hueVar);
 			Bitmap *bitmap = loadBitmap(filename, particleHue);
 			
@@ -226,7 +203,7 @@ void ParticleSystem::initParticles(const std::vector<std::string> &filenames, in
 		particle->setZoomX(1.0f + zoomVar / 100.0f);
 		particle->setZoomY(1.0f + zoomVar / 100.0f);
 
-		int particleOpacity = randomInt(opacity);
+		int particleOpacity = randomInt(m_initialOpacity);
 		m_opacity.push_back(particleOpacity);
 		particle->setOpacity(particleOpacity);
 
@@ -342,4 +319,126 @@ void ParticleSystem::dispose() {
 
 bool ParticleSystem::isDisposed() const {
 	return m_disposed;
+}
+// Individual setters
+void ParticleSystem::setMaxParticles(int maxParticles) {
+	m_maxParticles = maxParticles;
+}
+
+void ParticleSystem::setHue(int hue) {
+	m_hue = hue;
+}
+
+void ParticleSystem::setSlowdown(float slowdown) {
+	m_slowdown = slowdown;
+}
+
+void ParticleSystem::setXGravity(float xgravity) {
+	m_xgravity = xgravity;
+}
+
+void ParticleSystem::setYGravity(float ygravity) {
+	m_ygravity = ygravity;
+}
+
+void ParticleSystem::setXOffset(float xoffset) {
+	m_xoffset = xoffset;
+}
+
+void ParticleSystem::setYOffset(float yoffset) {
+	m_yoffset = yoffset;
+}
+
+void ParticleSystem::setOpacityVar(int opacityVar) {
+	m_opacityVar = opacityVar;
+}
+
+void ParticleSystem::setHueVar(int hueVar) {
+	m_hueVar = hueVar;
+}
+
+void ParticleSystem::setSizeVar(int sizeVar) {
+	m_sizeVar = sizeVar;
+}
+
+void ParticleSystem::setFadeSize(bool fadesize) {
+	m_fadesize = fadesize;
+}
+
+void ParticleSystem::setInitialOpacity(int opacity) {
+	m_initialOpacity = opacity;
+}
+
+void ParticleSystem::setZOffset(int zOffset) {
+	m_zoffset = zOffset;
+}
+
+void ParticleSystem::setFilenames(const std::vector<std::string> &filenames) {
+	m_filenames = filenames;
+}
+
+void ParticleSystem::setSpawnSpace(const std::vector<std::pair<int, int>> &spawnSpace) {
+	m_innerSpace = spawnSpace;
+	m_outlineSpace = spawnSpace;
+}
+
+// Individual getters
+int ParticleSystem::getMaxParticles() const {
+	return m_maxParticles;
+}
+
+int ParticleSystem::getHue() const {
+	return m_hue;
+}
+
+float ParticleSystem::getSlowdown() const {
+	return m_slowdown;
+}
+
+float ParticleSystem::getXGravity() const {
+	return m_xgravity;
+}
+
+float ParticleSystem::getYGravity() const {
+	return m_ygravity;
+}
+
+float ParticleSystem::getXOffset() const {
+	return m_xoffset;
+}
+
+float ParticleSystem::getYOffset() const {
+	return m_yoffset;
+}
+
+int ParticleSystem::getOpacityVar() const {
+	return m_opacityVar;
+}
+
+int ParticleSystem::getHueVar() const {
+	return m_hueVar;
+}
+
+int ParticleSystem::getSizeVar() const {
+	return m_sizeVar;
+}
+
+bool ParticleSystem::getFadeSize() const {
+	return m_fadesize;
+}
+
+int ParticleSystem::getInitialOpacity() const {
+	return m_initialOpacity;
+}
+
+int ParticleSystem::getZOffset() const {
+	return m_zoffset;
+}
+
+const std::vector<std::string> &ParticleSystem::getFilenames() const {
+	return m_filenames;
+}
+
+const std::vector<std::pair<int, int>> &ParticleSystem::getSpawnSpace() const {
+	return m_innerSpace;
 }

@@ -40,11 +40,39 @@ public:
 	ParticleSystem(Viewport *viewport = 0);
 	~ParticleSystem();
 
-	void setParameters(int maxParticles, int hue, float slowdown,
-	                   float xgravity, float ygravity, float xoffset, float yoffset,
-	                   int opacityVar, const std::vector<std::string> &filenames,
-	                   int opacity, int zOffset = -1, int hueVar = 0, 
-	                   int sizeVar = 0, bool fadesize = false);
+	// Individual setters
+	void setMaxParticles(int maxParticles);
+	void setHue(int hue);
+	void setSlowdown(float slowdown);
+	void setXGravity(float xgravity);
+	void setYGravity(float ygravity);
+	void setXOffset(float xoffset);
+	void setYOffset(float yoffset);
+	void setOpacityVar(int opacityVar);
+	void setHueVar(int hueVar);
+	void setSizeVar(int sizeVar);
+	void setFadeSize(bool fadesize);
+	void setInitialOpacity(int opacity);
+	void setZOffset(int zOffset);
+	void setFilenames(const std::vector<std::string> &filenames);
+	void setSpawnSpace(const std::vector<std::pair<int, int>> &spawnSpace);
+
+	// Individual getters
+	int getMaxParticles() const;
+	int getHue() const;
+	float getSlowdown() const;
+	float getXGravity() const;
+	float getYGravity() const;
+	float getXOffset() const;
+	float getYOffset() const;
+	int getOpacityVar() const;
+	int getHueVar() const;
+	int getSizeVar() const;
+	bool getFadeSize() const;
+	int getInitialOpacity() const;
+	int getZOffset() const;
+	const std::vector<std::string> &getFilenames() const;
+	const std::vector<std::pair<int, int>> &getSpawnSpace() const;
 
 	void update();
 	void setScreenPosition(int x, int y);
@@ -102,7 +130,7 @@ private:
 	bool m_disposed;
 
 	Bitmap *loadBitmap(const std::string &filename, int hue);
-	void initParticles(const std::vector<std::string> &filenames, int opacity, int zOffset);
+	void refresh();
 	void buildParticleSpaces();
 	std::pair<int, int> sampleFromSpace(bool useInner);
 
