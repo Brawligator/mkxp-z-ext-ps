@@ -365,19 +365,26 @@ void particleSystemBindingInit() {
 	_rb_define_method(klass, "initialize", particleSystemInitialize);
 	
 	// Individual setters and getters
-	INIT_PROP_BIND(klass, MaxParticles,"max_particles");
-	INIT_PROP_BIND(klass, Hue,"hue");
-	INIT_PROP_BIND(klass, HueVar,"hue_var");
-	INIT_PROP_BIND(klass, SizeVar,"size_var");
-	INIT_PROP_BIND(klass, InitialOpacity,"initial_opacity");
-	INIT_PROP_BIND(klass, BaseZoom,"base_zoom");
-	INIT_PROP_BIND(klass, LifeTime,"life_time");
-	INIT_PROP_BIND(klass, ZOffset,"z_offset");
-	INIT_PROP_BIND(klass, Filenames,"filenames");
-	INIT_PROP_BIND(klass, Velocity,"velocity");
-	INIT_PROP_BIND(klass, Acceleration,"acceleration");
-	INIT_PROP_BIND(klass, RandomVelocity,"random_velocity");
-	INIT_PROP_BIND(klass, RadialVelocity,"radial_velocity");
+	INIT_PROP_BIND(ParticleSystem, MaxParticles,"max_particles");
+	INIT_PROP_BIND(ParticleSystem, Hue,"hue");
+	INIT_PROP_BIND(ParticleSystem, HueVar,"hue_var");
+	INIT_PROP_BIND(ParticleSystem, SizeVar,"size_var");
+	INIT_PROP_BIND(ParticleSystem, InitialOpacity,"initial_opacity");
+	INIT_PROP_BIND(ParticleSystem, BaseZoom,"base_zoom");
+	INIT_PROP_BIND(ParticleSystem, LifeTime,"life_time");
+	INIT_PROP_BIND(ParticleSystem, ZOffset,"z_offset");
+
+	_rb_define_method(klass, "filenames=", particleSystemSetFilenames);
+	_rb_define_method(klass, "filenames", particleSystemGetFilenames);
+	_rb_define_method(klass, "velocity=", particleSystemSetVelocity);
+	_rb_define_method(klass, "velocity", particleSystemGetVelocity);
+	_rb_define_method(klass, "acceleration=", particleSystemSetAcceleration);
+	_rb_define_method(klass, "acceleration", particleSystemGetAcceleration);
+	_rb_define_method(klass, "random_velocity=", particleSystemSetRandomVelocity);
+	_rb_define_method(klass, "random_velocity", particleSystemGetRandomVelocity);
+	_rb_define_method(klass, "radial_velocity=", particleSystemSetRadialVelocity);
+	_rb_define_method(klass, "radial_velocity", particleSystemGetRadialVelocity);
+	
 	_rb_define_method(klass, "set_spawn_space", particleSystemSetSpawnSpace);
 	_rb_define_method(klass, "spawn_space", particleSystemGetSpawnSpace);
 	
