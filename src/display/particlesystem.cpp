@@ -60,10 +60,6 @@ Particle::Particle(Viewport *viewport)
 {
 }
 
-Particle::~Particle() {
-	dispose();
-}
-
 Vec2 Particle::getVelocity() const {
 	return velocity;
 }
@@ -233,7 +229,7 @@ void ParticleSystem::update(float deltaTime) {
 		
 		if (!particle) continue;
 
-		Vec3 newVelocity = Vec2(particle->getVelocity().x + m_acceleration.x * deltaTime,
+		Vec2 newVelocity = Vec2(particle->getVelocity().x + m_acceleration.x * deltaTime,
 		                       particle->getVelocity().y + m_acceleration.y * deltaTime);
 		particle->setVelocity(newVelocity);
 
@@ -442,7 +438,7 @@ const std::vector<std::string> &ParticleSystem::getFilenames() const {
 }
 
 const std::vector<std::pair<int, int>> &ParticleSystem::getSpawnSpace() const {
-	return m_innerSpace.append(m_outlineSpace);
+	return m_innerSpace;
 }
 
 Vec2 ParticleSystem::getVelocity() const {

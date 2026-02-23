@@ -40,7 +40,6 @@ class Particle : public Sprite
 {
 public:
 	Particle(Viewport *viewport = 0);
-	~Particle();
 	DECL_ATTR(Velocity, Vec2)
 	DECL_ATTR(RadialVelocity, Vec3)
 
