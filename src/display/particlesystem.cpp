@@ -199,11 +199,12 @@ void ParticleSystem::refresh() {
 		particle->setX(m_screenX + startPos.first);
 		particle->setY(m_screenY + startPos.second);
 		particle->setZ(m_zoffset);
-		particle->setVelocity(Vec2(m_velocity.x + randomFloat(1.0f) * m_random_velocity.x, m_velocity.y + randomFloat(1.0f) * m_random_velocity.y));
+		particle->setVelocity(Vec2(m_velocity.x + randomFloatRange(-1.0f, 1.0f) * m_random_velocity.x, m_velocity.y + randomFloatRange(-1.0f, 1.0f) * m_random_velocity.y));
 
 		float startLifetime = randomFloatRange(0.0f, 1.0f);
 		int particleOpacity = (int)(m_initialOpacity * (1 - startLifetime));
 		particle->setOpacity(particleOpacity);
+		particle->setLife(startLifetime);
 		
 		particle->setZoomX(m_baseZoom * (1.0f - startLifetime));
 		particle->setZoomY(m_baseZoom * (1.0f - startLifetime));
