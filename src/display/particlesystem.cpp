@@ -188,7 +188,7 @@ void ParticleSystem::initParticles(const std::vector<std::string> &filenames, in
 	m_bmwidth = 32;
 	m_bmheight = 32;
 
-	double innerThreshold = m_maxParticles * 0.85;
+	double innerThreshold = m_maxParticles * 0.8;
 
 	for (int i = 0; i < m_maxParticles; ++i) {
 		bool useInner = i >= innerThreshold;
