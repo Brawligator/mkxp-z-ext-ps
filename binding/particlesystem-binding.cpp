@@ -432,16 +432,21 @@ RB_METHOD(particleSystemRefresh) {
 	return Qnil;
 }
 
-RB_METHOD(particleSystemRefresh) {
-	GFX_LOCK;
-	
+RB_METHOD_GUARD(particleSystemSetXY) {
 	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	ps->refresh();
-	
-	GFX_UNLOCK;
-	return Qnil;
+	int x, y;
+	rb_get_args(argc, argv, "ii", &x, &y RB_ARG_END);
+	ps->setScreenPosition(x, y);
+	return self;
 }
-	
+
+RB_METHOD_GUARD(particleSystemSetZ) {
+	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
+	int z;
+	rb_get_args(argc, argv, "i", &z RB_ARG_END);
+	ps->setZ(z);
+	return self;
+}
 
 void particleSystemBindingInit() {
 	VALUE klass = rb_define_class("ParticleSystem", rb_cObject);
@@ -486,6 +491,9 @@ void particleSystemBindingInit() {
 	_rb_define_method(klass, "filenames", particleSystemGetFilenames);
 	_rb_define_method(klass, "spawn_space=", particleSystemSetSpawnSpace);
 	_rb_define_method(klass, "spawn_space", particleSystemGetSpawnSpace);
+	
+	_rb_define_method(klass, "set_xy", particleSystemSetXY);
+	_rb_define_method(klass, "set_z", particleSystemSetZ);
 	
 	_rb_define_method(klass, "update", particleSystemUpdate);
 	_rb_define_method(klass, "dispose", particleSystemDispose);

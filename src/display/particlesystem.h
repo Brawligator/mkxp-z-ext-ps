@@ -77,6 +77,7 @@ public:
 	void update();
 	void setScreenPosition(int x, int y);
 	void setZ(int z);
+	void refresh();
 	void dispose();
 	bool isDisposed() const;
 
@@ -130,7 +131,6 @@ private:
 	bool m_disposed;
 
 	Bitmap *loadBitmap(const std::string &filename, int hue);
-	void refresh();
 	void buildParticleSpaces();
 	std::pair<int, int> sampleFromSpace(bool useInner);
 
