@@ -67,12 +67,20 @@ Vec2 Particle::getBasePosition() const {
 	return base_position;
 }
 
+float Particle::getLife() const {
+	return life;
+}
+
 void Particle::setVelocity(Vec2 value) {
 	velocity = value;
 }
 
 void Particle::setBasePosition(Vec2 value) {
 	base_position = value;
+}
+
+void Particle::setLife(float value) {
+	life = value;
 }
 
 ParticleSystem::ParticleSystem(Viewport *viewport)
