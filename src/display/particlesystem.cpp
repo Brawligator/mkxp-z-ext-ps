@@ -217,7 +217,7 @@ void ParticleSystem::update(float deltaTime) {
 		return;
 	} */
 
-	int randN = randomInt(m_opacityVar);
+	// int randN = randomInt(m_opacityVar);
 	double iThresh = m_maxParticles * 0.9;
 
 	static const int OFFSETS[] = {-1, 1};
@@ -239,7 +239,7 @@ void ParticleSystem::update(float deltaTime) {
 		int particleZOffset = (i >= iThresh) ? 15 : -15;
 		particle->setZ(m_zoffset + particleZOffset);
 
-		int randI = ((randN + i) % 2);
+		// int randI = ((randN + i) % 2);
 
 		/* float xo = xOff * OFFSETS[randI & 1]; */
 
