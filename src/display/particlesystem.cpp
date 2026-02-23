@@ -359,7 +359,7 @@ void ParticleSystem::setRandomVelocity(Vec2 velocity) {
 	m_random_velocity = velocity;
 }
 
-void ParticleSystem::setRadialVelocity(Vec2 velocity) {
+void ParticleSystem::setRadialVelocity(Vec3 velocity) {
 	m_radial_velocity = velocity;
 }
 
@@ -412,7 +412,7 @@ Vec2 ParticleSystem::getRandomVelocity() const {
 	return m_random_velocity;
 }
 
-Vec2 ParticleSystem::getRadialVelocity() const {
+Vec3 ParticleSystem::getRadialVelocity() const {
 	return m_radial_velocity;
 }
 

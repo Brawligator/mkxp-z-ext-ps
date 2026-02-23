@@ -59,9 +59,10 @@ DEF_GFX_PROP_I(ParticleSystem, Hue)
 DEF_GFX_PROP_I(ParticleSystem, HueVar)
 DEF_GFX_PROP_I(ParticleSystem, SizeVar)
 DEF_GFX_PROP_I(ParticleSystem, InitialOpacity)
+DEF_GFX_PROP_I(ParticleSystem, ZOffset)
+
 DEF_GFX_PROP_F(ParticleSystem, BaseZoom)
 DEF_GFX_PROP_F(ParticleSystem, LifeTime)
-DEF_GFX_PROP_I(ParticleSystem, ZOffset)
 
 RB_METHOD(particleSystemSetFilenames) {
 	GFX_LOCK;

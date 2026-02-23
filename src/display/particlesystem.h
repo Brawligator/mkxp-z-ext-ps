@@ -110,7 +110,7 @@ private:
 
 	Vec2 m_velocity;
 	Vec2 m_acceleration;
-	Vec2 m_radial_velocity;
+	Vec3 m_radial_velocity;
 	Vec2 m_random_velocity;
 	float m_lifeTime;
 
