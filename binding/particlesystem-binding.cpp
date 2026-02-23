@@ -432,19 +432,26 @@ RB_METHOD(particleSystemRefresh) {
 	return Qnil;
 }
 
-RB_METHOD_GUARD(particleSystemSetXY) {
+RB_METHOD(particleSystemSetXY) {
+	GFX_LOCK;
+
 	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
 	int x, y;
 	rb_get_args(argc, argv, "ii", &x, &y RB_ARG_END);
 	ps->setScreenPosition(x, y);
+	
+	GFX_UNLOCK;
 	return self;
 }
 
-RB_METHOD_GUARD(particleSystemSetZ) {
+RB_METHOD(particleSystemSetZ) {
+	GFX_LOCK;
 	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
 	int z;
 	rb_get_args(argc, argv, "i", &z RB_ARG_END);
 	ps->setZ(z);
+	
+	GFX_UNLOCK;
 	return self;
 }
 
