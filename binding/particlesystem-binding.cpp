@@ -348,7 +348,7 @@ RB_METHOD(particleSystemSetAcceleration) {
 	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
 	int x, y;
 	rb_get_args(argc, argv, "ii", &x, &y RB_ARG_END);
-	ps->setAcceleration(x, y);
+	ps->setAcceleration(Vec2(x, y));
 	
 	GFX_UNLOCK;
 	return self;
