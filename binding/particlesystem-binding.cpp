@@ -54,165 +54,14 @@ RB_METHOD(particleSystemInitialize) {
 	return self;
 }
 
-RB_METHOD(particleSystemSetMaxParticles) {
-	GFX_LOCK;
-	
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	int maxParticles;
-	rb_get_args(argc, argv, "i", &maxParticles RB_ARG_END);
-	ps->setMaxParticles(maxParticles);
-	
-	GFX_UNLOCK;
-	return self;
-}
-
-RB_METHOD(particleSystemGetMaxParticles) {
-	GFX_LOCK;
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	int result = ps->getMaxParticles();
-	GFX_UNLOCK;
-	return INT2NUM(result);
-}
-
-RB_METHOD(particleSystemSetHue) {
-	GFX_LOCK;
-	
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	int hue;
-	rb_get_args(argc, argv, "i", &hue RB_ARG_END);
-	ps->setHue(hue);
-	
-	GFX_UNLOCK;
-	return self;
-}
-
-RB_METHOD(particleSystemGetHue) {
-	GFX_LOCK;
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	int result = ps->getHue();
-	GFX_UNLOCK;
-	return INT2NUM(result);
-}
-
-RB_METHOD(particleSystemSetHueVar) {
-	GFX_LOCK;
-	
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	int hueVar;
-	rb_get_args(argc, argv, "i", &hueVar RB_ARG_END);
-	ps->setHueVar(hueVar);
-	
-	GFX_UNLOCK;
-	return self;
-}
-
-RB_METHOD(particleSystemGetHueVar) {
-	GFX_LOCK;
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	int result = ps->getHueVar();
-	GFX_UNLOCK;
-	return INT2NUM(result);
-}
-
-RB_METHOD(particleSystemSetSizeVar) {
-	GFX_LOCK;
-	
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	int sizeVar;
-	rb_get_args(argc, argv, "i", &sizeVar RB_ARG_END);
-	ps->setSizeVar(sizeVar);
-	
-	GFX_UNLOCK;
-	return self;
-}
-
-RB_METHOD(particleSystemGetSizeVar) {
-	GFX_LOCK;
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	int result = ps->getSizeVar();
-	GFX_UNLOCK;
-	return INT2NUM(result);
-}
-
-RB_METHOD(particleSystemSetInitialOpacity) {
-	GFX_LOCK;
-	
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	int opacity;
-	rb_get_args(argc, argv, "i", &opacity RB_ARG_END);
-	ps->setInitialOpacity(opacity);
-	
-	GFX_UNLOCK;
-	return self;
-}
-
-RB_METHOD(particleSystemGetInitialOpacity) {
-	GFX_LOCK;
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	int result = ps->getInitialOpacity();
-	GFX_UNLOCK;
-	return INT2NUM(result);
-}
-
-RB_METHOD(particleSystemSetBaseZoom) {
-	GFX_LOCK;
-	
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	double baseZoom;
-	rb_get_args(argc, argv, "f", &baseZoom RB_ARG_END);
-	ps->setBaseZoom((float)baseZoom);
-	
-	GFX_UNLOCK;
-	return self;
-}
-
-RB_METHOD(particleSystemGetBaseZoom) {
-	GFX_LOCK;
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	float result = ps->getBaseZoom();
-	GFX_UNLOCK;
-	return DBL2NUM(result);
-}
-
-RB_METHOD(particleSystemSetLifeTime) {
-	GFX_LOCK;
-	
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	double lifeTime;
-	rb_get_args(argc, argv, "f", &lifeTime RB_ARG_END);
-	ps->setLifeTime((float)lifeTime);
-	
-	GFX_UNLOCK;
-	return self;
-}
-
-RB_METHOD(particleSystemGetLifeTime) {
-	GFX_LOCK;
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	float result = ps->getLifeTime();
-	GFX_UNLOCK;
-	return DBL2NUM(result);
-}
-
-RB_METHOD(particleSystemSetZOffset) {
-	GFX_LOCK;
-	
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	int zOffset;
-	rb_get_args(argc, argv, "i", &zOffset RB_ARG_END);
-	ps->setZOffset(zOffset);
-	
-	GFX_UNLOCK;
-	return self;
-}
-
-RB_METHOD(particleSystemGetZOffset) {
-	GFX_LOCK;
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	int result = ps->getZOffset();
-	GFX_UNLOCK;
-	return INT2NUM(result);
-}
+DEF_GFX_PROP_I(ParticleSystem, MaxParticles)
+DEF_GFX_PROP_I(ParticleSystem, Hue)
+DEF_GFX_PROP_I(ParticleSystem, HueVar)
+DEF_GFX_PROP_I(ParticleSystem, SizeVar)
+DEF_GFX_PROP_I(ParticleSystem, InitialOpacity)
+DEF_GFX_PROP_F(ParticleSystem, BaseZoom)
+DEF_GFX_PROP_F(ParticleSystem, LifeTime)
+DEF_GFX_PROP_I(ParticleSystem, ZOffset)
 
 RB_METHOD(particleSystemSetFilenames) {
 	GFX_LOCK;
@@ -321,9 +170,16 @@ RB_METHOD(particleSystemSetVelocity) {
 	GFX_LOCK;
 
 	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	int x, y;
-	rb_get_args(argc, argv, "ii", &x, &y RB_ARG_END);
-	ps->setVelocity(Vec2(x, y));
+	VALUE velocity;
+	rb_get_args(argc, argv, "o", &velocity RB_ARG_END);
+	
+	// Convert Ruby array of velocities to Vec2
+	Vec2 vel;
+	if (RB_TYPE_P(velocity, RUBY_T_ARRAY) && RARRAY_LEN(velocity) == 2) {
+		vel.x = NUM2INT(rb_ary_entry(velocity, 0));
+		vel.y = NUM2INT(rb_ary_entry(velocity, 1));
+	}
+	ps->setVelocity(vel);
 	
 	GFX_UNLOCK;
 	return self;
@@ -346,9 +202,16 @@ RB_METHOD(particleSystemSetAcceleration) {
 	GFX_LOCK;
 
 	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	int x, y;
-	rb_get_args(argc, argv, "ii", &x, &y RB_ARG_END);
-	ps->setAcceleration(Vec2(x, y));
+	VALUE acceleration;
+	rb_get_args(argc, argv, "o", &acceleration RB_ARG_END);
+	
+	// Convert Ruby array of velocities to Vec2
+	Vec2 acc;
+	if (RB_TYPE_P(acceleration, RUBY_T_ARRAY) && RARRAY_LEN(acceleration) == 2) {
+		acc.x = NUM2INT(rb_ary_entry(acceleration, 0));
+		acc.y = NUM2INT(rb_ary_entry(acceleration, 1));
+	}
+	ps->setAcceleration(acc);
 	
 	GFX_UNLOCK;
 	return self;
@@ -365,6 +228,72 @@ RB_METHOD(particleSystemGetAcceleration) {
 
 	GFX_UNLOCK;
 	return rbPair;
+}
+
+RB_METHOD(particleSystemSetRandomVelocity) {
+	GFX_LOCK;
+
+	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
+	VALUE velocity;
+	rb_get_args(argc, argv, "o", &velocity RB_ARG_END);
+	
+	// Convert Ruby array of velocities to Vec2
+	Vec2 vel;
+	if (RB_TYPE_P(velocity, RUBY_T_ARRAY) && RARRAY_LEN(velocity) == 2) {
+		vel.x = NUM2INT(rb_ary_entry(velocity, 0));
+		vel.y = NUM2INT(rb_ary_entry(velocity, 1));
+	}
+	ps->setRandomVelocity(vel);
+	
+	GFX_UNLOCK;
+	return self;
+}
+
+RB_METHOD(particleSystemGetRandomVelocity) {
+	GFX_LOCK;
+	
+	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
+	Vec2 velocity = ps->getRandomVelocity();
+	VALUE rbPair = rb_ary_new2(2);
+	rb_ary_push(rbPair, INT2NUM(velocity.x));
+	rb_ary_push(rbPair, INT2NUM(velocity.y));
+
+	GFX_UNLOCK;
+	return rbPair;
+}
+
+RB_METHOD(particleSystemSetRadialVelocity) {
+	GFX_LOCK;
+
+	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
+	VALUE radial_velocity;
+	rb_get_args(argc, argv, "o", &radial_velocity RB_ARG_END);
+	
+	// Convert Ruby array of velocities to Vec2
+	Vec3 radial_vel;
+	if (RB_TYPE_P(radial_velocity, RUBY_T_ARRAY) && RARRAY_LEN(radial_velocity) == 3) {
+		radial_vel.x = NUM2INT(rb_ary_entry(radial_velocity, 0));
+		radial_vel.y = NUM2INT(rb_ary_entry(radial_velocity, 1));
+		radial_vel.z = NUM2INT(rb_ary_entry(radial_velocity, 2));
+	}
+	ps->setRadialVelocity(radial_vel);
+	
+	GFX_UNLOCK;
+	return self;
+}
+
+RB_METHOD(particleSystemGetRadialVelocity) {
+	GFX_LOCK;
+	
+	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
+	Vec3 radialVelocity = ps->getRadialVelocity();
+	VALUE rbTriplet = rb_ary_new2(3);
+	rb_ary_push(rbTriplet, INT2NUM(radialVelocity.x));
+	rb_ary_push(rbTriplet, INT2NUM(radialVelocity.y));
+	rb_ary_push(rbTriplet, INT2NUM(radialVelocity.z));
+
+	GFX_UNLOCK;
+	return rbTriplet;
 }
 
 RB_METHOD(particleSystemUpdate) {
@@ -435,30 +364,21 @@ void particleSystemBindingInit() {
 	_rb_define_method(klass, "initialize", particleSystemInitialize);
 	
 	// Individual setters and getters
-	_rb_define_method(klass, "max_particles=", particleSystemSetMaxParticles);
-	_rb_define_method(klass, "max_particles", particleSystemGetMaxParticles);
-	_rb_define_method(klass, "hue=", particleSystemSetHue);
-	_rb_define_method(klass, "hue", particleSystemGetHue);
-	_rb_define_method(klass, "hue_var=", particleSystemSetHueVar);
-	_rb_define_method(klass, "hue_var", particleSystemGetHueVar);
-	_rb_define_method(klass, "size_var=", particleSystemSetSizeVar);
-	_rb_define_method(klass, "size_var", particleSystemGetSizeVar);
-	_rb_define_method(klass, "initial_opacity=", particleSystemSetInitialOpacity);
-	_rb_define_method(klass, "initial_opacity", particleSystemGetInitialOpacity);
-	_rb_define_method(klass, "base_zoom=", particleSystemSetBaseZoom);
-	_rb_define_method(klass, "base_zoom", particleSystemGetBaseZoom);
-	_rb_define_method(klass, "life_time=", particleSystemSetLifeTime);
-	_rb_define_method(klass, "life_time", particleSystemGetLifeTime);
-	_rb_define_method(klass, "z_offset=", particleSystemSetZOffset);
-	_rb_define_method(klass, "z_offset", particleSystemGetZOffset);
-	_rb_define_method(klass, "filenames=", particleSystemSetFilenames);
-	_rb_define_method(klass, "filenames", particleSystemGetFilenames);
+	INIT_PROP_BIND(klass, MaxParticles,"max_particles");
+	INIT_PROP_BIND(klass, Hue,"hue");
+	INIT_PROP_BIND(klass, HueVar,"hue_var");
+	INIT_PROP_BIND(klass, SizeVar,"size_var");
+	INIT_PROP_BIND(klass, InitialOpacity,"initial_opacity");
+	INIT_PROP_BIND(klass, BaseZoom,"base_zoom");
+	INIT_PROP_BIND(klass, LifeTime,"life_time");
+	INIT_PROP_BIND(klass, ZOffset,"z_offset");
+	INIT_PROP_BIND(klass, Filenames,"filenames");
+	INIT_PROP_BIND(klass, Velocity,"velocity");
+	INIT_PROP_BIND(klass, Acceleration,"acceleration");
+	INIT_PROP_BIND(klass, RandomVelocity,"random_velocity");
+	INIT_PROP_BIND(klass, RadialVelocity,"radial_velocity");
 	_rb_define_method(klass, "set_spawn_space", particleSystemSetSpawnSpace);
 	_rb_define_method(klass, "spawn_space", particleSystemGetSpawnSpace);
-	_rb_define_method(klass, "velocity=", particleSystemSetVelocity);
-	_rb_define_method(klass, "velocity", particleSystemGetVelocity);
-	_rb_define_method(klass, "acceleration=", particleSystemSetAcceleration);
-	_rb_define_method(klass, "acceleration", particleSystemGetAcceleration);
 	
 	_rb_define_method(klass, "set_xy", particleSystemSetXY);
 	_rb_define_method(klass, "set_z", particleSystemSetZ);

@@ -55,7 +55,6 @@ static float randomFloatRange(float minVal, float maxVal) {
 Particle::Particle(Viewport *viewport)
 	: Sprite(viewport),
 	  velocity(0, 0),
-	  radial_velocity(0, 0, 0),
 	  life(0)
 {
 }
@@ -64,16 +63,16 @@ Vec2 Particle::getVelocity() const {
 	return velocity;
 }
 
-Vec3 Particle::getRadialVelocity() const {
-	return radial_velocity;
+Vec2 Particle::getBasePosition() const {
+	return base_position;
 }
 
 void Particle::setVelocity(Vec2 value) {
 	velocity = value;
 }
 
-void Particle::setRadialVelocity(Vec3 value) {
-	radial_velocity = value;
+void Particle::setBasePosition(Vec2 value) {
+	base_position = value;
 }
 
 ParticleSystem::ParticleSystem(Viewport *viewport)
@@ -182,6 +181,8 @@ void ParticleSystem::refresh() {
 		Particle *particle = new Particle(m_viewport);
 		m_particles.push_back(particle);
 
+		particle->setBasePosition(Vec2(startPos.first, startPos.second));
+
 		if (!m_filenames.empty()) {
 			const std::string &filename = m_filenames[randomInt(m_filenames.size())];
 			int particleHue = m_hue + randomFloatRange(-m_hueVar, m_hueVar);
@@ -198,7 +199,7 @@ void ParticleSystem::refresh() {
 		particle->setX(m_screenX + startPos.first);
 		particle->setY(m_screenY + startPos.second);
 		particle->setZ(m_zoffset);
-		particle->setVelocity(m_velocity);
+		particle->setVelocity(Vec2(m_velocity.x + randomFloat(1.0f) * m_random_velocity.x, m_velocity.y + randomFloat(1.0f) * m_random_velocity.y));
 
 		float startLifetime = randomFloatRange(0.0f, 1.0f);
 		int particleOpacity = (int)(m_initialOpacity * (1 - startLifetime));
@@ -228,9 +229,10 @@ void ParticleSystem::update(float deltaTime) {
 		Vec2 newVelocity = Vec2(particle->getVelocity().x + m_acceleration.x * deltaTime,
 		                       particle->getVelocity().y + m_acceleration.y * deltaTime);
 		particle->setVelocity(newVelocity);
+		particle->setLife(particle->getLife() + deltaTime);
 
-		particle->setX(particle->getX() + (particle->getVelocity().x /* + cos(particle->getRadialVelocity().x + sin(particle->getRadialVelocity().z)) */) * deltaTime);
-		particle->setY(particle->getY() + (particle->getVelocity().y /* + sin(particle->getRadialVelocity().y + cos(particle->getRadialVelocity().z)) */) * deltaTime);
+		particle->setX(m_screenX + particle->getBasePosition().x + (particle->getVelocity().x + cos(particle->getLife() * m_hueVar)*m_radial_velocity.x + sin(particle->getLife() * m_hueVar)*m_radial_velocity.z) * particle->getLife());
+		particle->setY(m_screenY + particle->getBasePosition().y + (particle->getVelocity().y + sin(particle->getLife() * m_hueVar)*m_radial_velocity.y + cos(particle->getLife() * m_hueVar)*m_radial_velocity.z) * particle->getLife());
 
 		int particleZOffset = (i >= iThresh) ? 15 : -15;
 		particle->setZ(m_zoffset + particleZOffset);
@@ -241,11 +243,12 @@ void ParticleSystem::update(float deltaTime) {
 			particle->setOpacity(m_initialOpacity);
 			bool useInner = i >= iThresh;
 			auto startPos = sampleFromSpace(useInner);
+			particle->setBasePosition(Vec2(startPos.first, startPos.second));
 			particle->setX(m_screenX + startPos.first);
 			particle->setY(m_screenY + startPos.second);
 			particle->setZoomX(m_baseZoom);
 			particle->setZoomY(m_baseZoom);
-			particle->setVelocity(m_velocity);
+			particle->setVelocity(Vec2(m_velocity.x + randomFloat(1.0f) * m_random_velocity.x, m_velocity.y + randomFloat(1.0f) * m_random_velocity.y));
 			continue;
 		}
 
@@ -352,6 +355,14 @@ void ParticleSystem::setAcceleration(Vec2 acceleration) {
 	m_acceleration = acceleration;
 }
 
+void ParticleSystem::setRandomVelocity(Vec2 velocity) {
+	m_random_velocity = velocity;
+}
+
+void ParticleSystem::setRadialVelocity(Vec2 velocity) {
+	m_radial_velocity = velocity;
+}
+
 // Individual getters
 int ParticleSystem::getMaxParticles() const {
 	return m_maxParticles;
@@ -395,6 +406,14 @@ const std::vector<std::pair<int, int>> &ParticleSystem::getSpawnSpace() const {
 
 Vec2 ParticleSystem::getVelocity() const {
 	return m_velocity;
+}
+
+Vec2 ParticleSystem::getRandomVelocity() const {
+	return m_random_velocity;
+}
+
+Vec2 ParticleSystem::getRadialVelocity() const {
+	return m_radial_velocity;
 }
 
 Vec2 ParticleSystem::getAcceleration() const {

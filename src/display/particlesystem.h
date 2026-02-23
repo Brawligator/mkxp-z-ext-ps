@@ -42,10 +42,12 @@ public:
 	Particle(Viewport *viewport = 0);
 	DECL_ATTR(Velocity, Vec2)
 	DECL_ATTR(RadialVelocity, Vec3)
+	DECL_ATTR(BasePosition, Vec2)
+	DECL_ATTR(Life, float)
 
 private:
 	Vec2 velocity;
-	Vec3 radial_velocity;
+	Vec2 base_position;
 	float life;
 };
 
@@ -67,6 +69,8 @@ public:
 	void setFilenames(const std::vector<std::string> &filenames);
 	void setSpawnSpaces(const std::vector<std::pair<int, int>> &spawnSpace, const std::vector<std::pair<int, int>> &outlineSpace);
 	void setVelocity(Vec2 velocity);
+	void setRandomVelocity(Vec2 velocity);
+	void setRadialVelocity(Vec2 velocity);	
 	void setAcceleration(Vec2 acceleration);
 
 	// Individual getters
@@ -81,6 +85,8 @@ public:
 	const std::vector<std::string> &getFilenames() const;
 	const std::vector<std::pair<int, int>> &getSpawnSpace() const;
 	Vec2 getVelocity() const;
+	Vec2 getRandomVelocity() const;
+	Vec2 getRadialVelocity() const;
 	Vec2 getAcceleration() const;
 
 	void update(float deltaTime);
@@ -104,6 +110,8 @@ private:
 
 	Vec2 m_velocity;
 	Vec2 m_acceleration;
+	Vec2 m_radial_velocity;
+	Vec2 m_random_velocity;
 	float m_lifeTime;
 
 	// Particle data
