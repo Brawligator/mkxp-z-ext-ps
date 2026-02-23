@@ -27,12 +27,27 @@
 #include <vector>
 #include <utility>
 #include "util/disposable.h"
+#include "util.h"
 
 class Sprite;
 class Bitmap;
 class Viewport;
 
 typedef std::pair<std::string, int> BitmapKey;
+
+class Particle : public Sprite
+{
+public:
+	Particle(Viewport *viewport = 0);
+	~Particle();
+	DECL_ATTR(Velocity, Vec2)
+	DECL_ATTR(RadialVelocity, Vec3)
+
+private:
+	Vec2 velocity;
+	Vec3 radial_velocity;
+	float life;
+};
 
 class ParticleSystem
 {
@@ -46,16 +61,18 @@ public:
 	void setSlowdown(float slowdown);
 	void setXGravity(float xgravity);
 	void setYGravity(float ygravity);
-	void setXOffset(float xoffset);
-	void setYOffset(float yoffset);
 	void setOpacityVar(int opacityVar);
 	void setHueVar(int hueVar);
 	void setSizeVar(int sizeVar);
 	void setFadeSize(bool fadesize);
 	void setInitialOpacity(int opacity);
+	void setBaseZoom(float baseZoom);
+	void setLifeTime(float lifeTime);
 	void setZOffset(int zOffset);
 	void setFilenames(const std::vector<std::string> &filenames);
-	void setSpawnSpace(const std::vector<std::pair<int, int>> &spawnSpace);
+	void setSpawnSpaces(const std::vector<std::pair<int, int>> &spawnSpace, const std::vector<std::pair<int, int>> &outlineSpace);
+	void setVelocity(Vec2 velocity);
+	void setAcceleration(Vec2 acceleration);
 
 	// Individual getters
 	int getMaxParticles() const;
@@ -63,18 +80,20 @@ public:
 	float getSlowdown() const;
 	float getXGravity() const;
 	float getYGravity() const;
-	float getXOffset() const;
-	float getYOffset() const;
 	int getOpacityVar() const;
 	int getHueVar() const;
 	int getSizeVar() const;
 	bool getFadeSize() const;
 	int getInitialOpacity() const;
+	float getBaseZoom() const;
+	float getLifeTime() const;
 	int getZOffset() const;
 	const std::vector<std::string> &getFilenames() const;
 	const std::vector<std::pair<int, int>> &getSpawnSpace() const;
+	Vec2 getVelocity() const;
+	Vec2 getAcceleration() const;
 
-	void update();
+	void update(float deltaTime);
 	void setScreenPosition(int x, int y);
 	void setZ(int z);
 	void refresh();
@@ -90,48 +109,38 @@ private:
 	float m_slowdown;
 	float m_xgravity;
 	float m_ygravity;
-	float m_xoffset;
-	float m_yoffset;
 	int m_opacityVar;
 	int m_hueVar;
 	int m_sizeVar;
 	bool m_fadesize;
 	int m_initialOpacity;
+	float m_baseZoom;
 	int m_zoffset;
 
+	float m_spawnRate;
+	Vec2 m_velocity;
+	Vec2 m_acceleration;
+	float m_lifeTime;
+
 	// Particle data
-	std::vector<Sprite*> m_particles;
-	std::vector<int> m_particlesStartX;
-	std::vector<int> m_particlesStartY;
-	std::vector<float> m_particleX;
-	std::vector<float> m_particleY;
-	std::vector<int> m_opacity;
+	std::vector<Particle*> m_particles;
 
 	// State
-	float m_startingX;
-	float m_startingY;
 	float m_screenX;
 	float m_screenY;
-	int m_realX;
-	int m_realY;
-	int m_offsetX;
-	int m_offsetY;
 
 	// Bitmap cache
 	std::map<BitmapKey, Bitmap*> m_bitmaps;
+	std::vector<std::string> m_filenames;
 
 	// Particle sampling
 	std::vector<std::pair<int, int>> m_innerSpace;
 	std::vector<std::pair<int, int>> m_outlineSpace;
 
-	// Filenames
-	std::vector<std::string> m_filenames;
-	int m_bmwidth;
-	int m_bmheight;
 	bool m_disposed;
 
 	Bitmap *loadBitmap(const std::string &filename, int hue);
-	void buildParticleSpaces();
+	void buildDefaultSpaces();
 	std::pair<int, int> sampleFromSpace(bool useInner);
 
 	const char *klassName() const { return "ParticleSystem"; }

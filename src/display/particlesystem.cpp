@@ -50,6 +50,35 @@ static float randomFloatRange(float minVal, float maxVal) {
 	return dist(g_rng);
 }
 
+
+Particle::Particle(Viewport *viewport)
+	: Sprite(viewport),
+	  velocity(0, 0),
+	  radial_velocity(0, 0, 0),
+	  life(0)
+{
+}
+
+Particle::~Particle() {
+	dispose();
+}
+
+Vec2 Particle::getVelocity() const {
+	return velocity;
+}
+
+Vec3 Particle::getRadialVelocity() const {
+	return radial_velocity;
+}
+
+void Particle::setVelocity(Vec2 value) {
+	velocity = value;
+}
+
+void Particle::setRadialVelocity(Vec3 value) {
+	radial_velocity = value;
+}
+
 ParticleSystem::ParticleSystem(Viewport *viewport)
 	: m_viewport(viewport),
 	  m_maxParticles(0),
@@ -57,24 +86,16 @@ ParticleSystem::ParticleSystem(Viewport *viewport)
 	  m_slowdown(1.0f),
 	  m_xgravity(0.0f),
 	  m_ygravity(0.0f),
-	  m_xoffset(0.0f),
-	  m_yoffset(0.0f),
 	  m_opacityVar(1),
 	  m_hueVar(0),
 	  m_sizeVar(0),
 	  m_fadesize(false),
 	  m_initialOpacity(255),
-	  m_zoffset(-1),
-	  m_startingX(0),
-	  m_startingY(0),
+	  m_baseZoom(1.0f),
+	  m_velocity(0, 0),	  m_acceleration(0, 0),
+	  m_lifeTime(1.0f),	  m_zoffset(-1),
 	  m_screenX(0),
 	  m_screenY(0),
-	  m_realX(0),
-	  m_realY(0),
-	  m_offsetX(0),
-	  m_offsetY(0),
-	  m_bmwidth(32),
-	  m_bmheight(32),
 	  m_disposed(false)
 {
 	g_rng.seed(std::random_device{}());
@@ -113,7 +134,7 @@ std::pair<int, int> ParticleSystem::sampleFromSpace(bool useInner) {
 	return space[idx];
 }
 
-void ParticleSystem::buildParticleSpaces() {
+void ParticleSystem::buildDefaultSpaces() {
 	const int DIAMETER = 32;
 	const int RADIUS = DIAMETER / 2;
 	const float RADIUS_SQ = RADIUS * RADIUS;
@@ -141,29 +162,22 @@ void ParticleSystem::buildParticleSpaces() {
 }
 
 void ParticleSystem::refresh() {
-	int zOffset = m_zoffset;
 
 	// Clean up existing particles
-	for (auto sprite : m_particles) {
-		if (sprite) {
-			sprite->dispose();
-			delete sprite;
+	for (auto particle : m_particles) {
+		if (particle) {
+			particle->dispose();
+			delete particle;
 		}
 	}
 	m_particles.clear();
-	m_particlesStartX.clear();
-	m_particlesStartY.clear();
-	m_particleX.clear();
-	m_particleY.clear();
-	m_opacity.clear();
 
-	buildParticleSpaces();
+	if (m_innerSpace.empty() && m_outlineSpace.empty()) {
+		buildDefaultSpaces();
+	}
 
-	m_startingX = m_screenX + m_xoffset;
-	m_startingY = m_screenY + m_yoffset;
-
-	m_bmwidth = 32;
-	m_bmheight = 32;
+	int bmwidth = 0;
+	int bmheight = 0;
 
 	double innerThreshold = m_maxParticles * 0.9;
 
@@ -171,12 +185,7 @@ void ParticleSystem::refresh() {
 		bool useInner = i >= innerThreshold;
 		auto startPos = sampleFromSpace(useInner);
 
-		m_particlesStartX.push_back(startPos.first);
-		m_particlesStartY.push_back(startPos.second);
-		m_particleX.push_back(-m_xoffset);
-		m_particleY.push_back(-m_yoffset);
-
-		Sprite *particle = new Sprite(m_viewport);
+		Particle *particle = new Particle(m_viewport);
 		m_particles.push_back(particle);
 
 		if (!m_filenames.empty()) {
@@ -186,110 +195,94 @@ void ParticleSystem::refresh() {
 			
 			if (bitmap) {
 				particle->setBitmap(bitmap);
-				if (i == 0) {
-					m_bmwidth = bitmap->width();
-					m_bmheight = bitmap->height();
-				}
+
+				particle->setOX(bitmap->width() / 2);
+				particle->setOY(bitmap->height() / 2);
 			}
 		}
 
-		particle->setOX(m_bmwidth / 2);
-		particle->setOY(m_bmheight / 2);
-		particle->setY(m_startingY + m_particlesStartX[i]);
-		particle->setX(m_startingX + m_particlesStartY[i]);
+		particle->setX(m_screenX + startPos.first);
+		particle->setY(m_screenY + startPos.second);
 		particle->setZ(m_zoffset);
-		
-		int zoomVar = m_sizeVar > 0 ? randomFloatRange(-m_sizeVar, m_sizeVar) : 0;
-		particle->setZoomX(1.0f + zoomVar / 100.0f);
-		particle->setZoomY(1.0f + zoomVar / 100.0f);
+		particle->setVelocity(m_velocity);
 
-		int particleOpacity = randomInt(m_initialOpacity);
-		m_opacity.push_back(particleOpacity);
+		float startLifetime = randomFloatRange(1f);
+		int particleOpacity = (int)(m_initialOpacity * (1 - startLifetime));
 		particle->setOpacity(particleOpacity);
-
-		if (m_fadesize) {
-			float opacityFactor = (particleOpacity / 255.0f + 0.2f);
-			if (opacityFactor > 1.0f) opacityFactor = 1.0f;
-			if (opacityFactor < 0.0f) opacityFactor = 0.0f;
-			particle->setZoomX((1.0f + zoomVar / 100.0f) * opacityFactor);
-			particle->setZoomY((1.0f + zoomVar / 100.0f) * opacityFactor);
-		}
+		
+		particle->setZoomX(m_baseZoom * (1.0f - startLifetime));
+		particle->setZoomY(m_baseZoom * (1.0f - startLifetime));
 	}
 }
 
-void ParticleSystem::update() {
+void ParticleSystem::update(float deltaTime) {
 	/* if (m_viewport && (m_viewport->getRect().x >= 640 || m_viewport->getRect().y >= 480)) {
 		return;
 	} */
 
-	m_startingX = m_screenX + m_xoffset;
-	m_startingY = m_screenY + m_yoffset;
-
-	m_offsetX = 0;
-	m_offsetY = 0;
-
 	int randN = randomInt(m_opacityVar);
-	int particleZ = m_zoffset;
-	float xSum = m_startingX + m_xoffset;
-	float ySum = m_startingY + m_yoffset;
-	float xOff = m_xgravity * m_slowdown;
-	float yOff = -m_ygravity * m_slowdown;
 	double iThresh = m_maxParticles * 0.9;
 
 	static const int OFFSETS[] = {-1, 1};
 
 	for (int i = 0; i < m_maxParticles; ++i) {
-		Sprite *particle = m_particles[i];
+		if (i >= m_particles.size()) break;
+
+		Particle *particle = m_particles[i];
 		
 		if (!particle) continue;
 
-		int particleZOffset = (i >= iThresh) ? 15 : -15;
-		particle->setZ(particleZ + particleZOffset);
+		Vec3 newVelocity = Vec2(particle->getVelocity().x + m_acceleration.x * deltaTime,
+		                       particle->getVelocity().y + m_acceleration.y * deltaTime);
+		particle->setVelocity(newVelocity);
 
-		if (m_opacity[i] <= 0) {
-			m_opacity[i] = 255;
+		particle->setX(particle->getX() + (particle->getVelocity().x /* + cos(particle->getRadialVelocity().x + sin(particle->getRadialVelocity().z)) */) * deltaTime);
+		particle->setY(particle->getY() + (particle->getVelocity().y /* + sin(particle->getRadialVelocity().y + cos(particle->getRadialVelocity().z)) */) * deltaTime);
+
+		int particleZOffset = (i >= iThresh) ? 15 : -15;
+		particle->setZ(m_zoffset + particleZOffset);
+
+		int randI = ((randN + i) % 2);
+
+		/* float xo = xOff * OFFSETS[randI & 1]; */
+
+		int newOpacity = particle->getOpacity() - (int)(deltaTime * 255.0f / m_lifeTime);
+
+		if (newOpacity <= 0) {
+			particle->setOpacity(m_initialOpacity);
 			bool useInner = i >= iThresh;
 			auto startPos = sampleFromSpace(useInner);
-			m_particlesStartX[i] = startPos.first;
-			m_particlesStartY[i] = startPos.second;
-			particle->setX(xSum);
-			particle->setY(ySum);
-			m_particleX[i] = 0.0f;
-			m_particleY[i] = 0.0f;
-			particle->setZoomX(1.0f);
-			particle->setZoomY(1.0f);
+			particle->setX(m_screenX + startPos.first);
+			particle->setY(m_screenY + startPos.second);
+			particle->setZoomX(m_baseZoom);
+			particle->setZoomY(m_baseZoom);
+			particle->setVelocity(m_velocity);
 			continue;
 		}
 
-		int randI = ((randN + i) % m_opacityVar);
-
-		float xo = xOff * OFFSETS[randI & 1];
-		float yo = yOff;
-		
-		m_particleX[i] += xo;
-		m_particleY[i] += yo;
-		m_particleX[i] -= m_offsetX;
-		m_particleY[i] -= m_offsetY;
-
-		particle->setX(m_particleX[i] + xSum + m_particlesStartX[i]);
-		particle->setY(m_particleY[i] + ySum + m_particlesStartY[i]);
-
-		m_opacity[i] = m_opacity[i] - (randI * m_slowdown);
-		
-		float zoom = (m_opacity[i] / 255.0f + 0.2f);
-		if (zoom > 1.0f) zoom = 1.0f;
+		float zoom = (newOpacity / 255.0f) * m_baseZoom;
 		if (zoom < 0.0f) zoom = 0.0f;
 		
 		particle->setZoomX(zoom);
 		particle->setZoomY(zoom);
-		particle->setOpacity(m_opacity[i]);
+		particle->setOpacity(newOpacity);
 	}
 }
 
 void ParticleSystem::setScreenPosition(int x, int y)
 {
+	float oldX = m_screenX;
+	float oldY = m_screenY;
+
 	m_screenX = x;
 	m_screenY = y;
+
+	for (auto particle : m_particles) {
+		if (particle) {
+			particle->setX(particle->getX() + (m_screenX - oldX));
+			particle->setY(particle->getY() + (m_screenY - oldY));
+		}
+	}
 }
 
 void ParticleSystem::setZ(int z)
@@ -298,11 +291,11 @@ void ParticleSystem::setZ(int z)
 }
 
 void ParticleSystem::dispose() {
-	for (auto sprite : m_particles) {
-		if (sprite) {
-			if (!sprite->isDisposed())
-				sprite->dispose();
-			delete sprite;
+	for (auto particle : m_particles) {
+		if (particle) {
+			if (!particle->isDisposed())
+				particle->dispose();
+			delete particle;
 		}
 	}
 	m_particles.clear();
@@ -341,14 +334,6 @@ void ParticleSystem::setYGravity(float ygravity) {
 	m_ygravity = ygravity;
 }
 
-void ParticleSystem::setXOffset(float xoffset) {
-	m_xoffset = xoffset;
-}
-
-void ParticleSystem::setYOffset(float yoffset) {
-	m_yoffset = yoffset;
-}
-
 void ParticleSystem::setOpacityVar(int opacityVar) {
 	m_opacityVar = opacityVar;
 }
@@ -369,6 +354,14 @@ void ParticleSystem::setInitialOpacity(int opacity) {
 	m_initialOpacity = opacity;
 }
 
+void ParticleSystem::setBaseZoom(float baseZoom) {
+	m_baseZoom = baseZoom;
+}
+
+void ParticleSystem::setLifeTime(float lifeTime) {
+	m_lifeTime = lifeTime;
+}
+
 void ParticleSystem::setZOffset(int zOffset) {
 	m_zoffset = zOffset;
 }
@@ -377,9 +370,17 @@ void ParticleSystem::setFilenames(const std::vector<std::string> &filenames) {
 	m_filenames = filenames;
 }
 
-void ParticleSystem::setSpawnSpace(const std::vector<std::pair<int, int>> &spawnSpace) {
-	m_innerSpace = spawnSpace;
-	m_outlineSpace = spawnSpace;
+void ParticleSystem::setSpawnSpaces(const std::vector<std::pair<int, int>> &innerSpace, const std::vector<std::pair<int, int>> &outlineSpace) {
+	m_innerSpace = innerSpace;
+	m_outlineSpace = outlineSpace;
+}
+
+void ParticleSystem::setVelocity(Vec2 velocity) {
+	m_velocity = velocity;
+}
+
+void ParticleSystem::setAcceleration(Vec2 acceleration) {
+	m_acceleration = acceleration;
 }
 
 // Individual getters
@@ -403,14 +404,6 @@ float ParticleSystem::getYGravity() const {
 	return m_ygravity;
 }
 
-float ParticleSystem::getXOffset() const {
-	return m_xoffset;
-}
-
-float ParticleSystem::getYOffset() const {
-	return m_yoffset;
-}
-
 int ParticleSystem::getOpacityVar() const {
 	return m_opacityVar;
 }
@@ -431,6 +424,14 @@ int ParticleSystem::getInitialOpacity() const {
 	return m_initialOpacity;
 }
 
+float ParticleSystem::getBaseZoom() const {
+	return m_baseZoom;
+}
+
+float ParticleSystem::getLifeTime() const {
+	return m_lifeTime;
+}
+
 int ParticleSystem::getZOffset() const {
 	return m_zoffset;
 }
@@ -440,5 +441,13 @@ const std::vector<std::string> &ParticleSystem::getFilenames() const {
 }
 
 const std::vector<std::pair<int, int>> &ParticleSystem::getSpawnSpace() const {
-	return m_innerSpace;
+	return m_innerSpace.append(m_outlineSpace);
+}
+
+Vec2 ParticleSystem::getVelocity() const {
+	return m_velocity;
+}
+
+Vec2 ParticleSystem::getAcceleration() const {
+	return m_acceleration;
 }

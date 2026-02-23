@@ -153,46 +153,6 @@ RB_METHOD(particleSystemGetYGravity) {
 	return DBL2NUM(result);
 }
 
-RB_METHOD(particleSystemSetXOffset) {
-	GFX_LOCK;
-	
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	double xoffset;
-	rb_get_args(argc, argv, "f", &xoffset RB_ARG_END);
-	ps->setXOffset((float)xoffset);
-	
-	GFX_UNLOCK;
-	return self;
-}
-
-RB_METHOD(particleSystemGetXOffset) {
-	GFX_LOCK;
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	float result = ps->getXOffset();
-	GFX_UNLOCK;
-	return DBL2NUM(result);
-}
-
-RB_METHOD(particleSystemSetYOffset) {
-	GFX_LOCK;
-	
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	double yoffset;
-	rb_get_args(argc, argv, "f", &yoffset RB_ARG_END);
-	ps->setYOffset((float)yoffset);
-	
-	GFX_UNLOCK;
-	return self;
-}
-
-RB_METHOD(particleSystemGetYOffset) {
-	GFX_LOCK;
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	float result = ps->getYOffset();
-	GFX_UNLOCK;
-	return DBL2NUM(result);
-}
-
 RB_METHOD(particleSystemSetOpacityVar) {
 	GFX_LOCK;
 	
@@ -293,6 +253,46 @@ RB_METHOD(particleSystemGetInitialOpacity) {
 	return INT2NUM(result);
 }
 
+RB_METHOD(particleSystemSetBaseZoom) {
+	GFX_LOCK;
+	
+	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
+	double baseZoom;
+	rb_get_args(argc, argv, "f", &baseZoom RB_ARG_END);
+	ps->setBaseZoom((float)baseZoom);
+	
+	GFX_UNLOCK;
+	return self;
+}
+
+RB_METHOD(particleSystemGetBaseZoom) {
+	GFX_LOCK;
+	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
+	float result = ps->getBaseZoom();
+	GFX_UNLOCK;
+	return DBL2NUM(result);
+}
+
+RB_METHOD(particleSystemSetLifeTime) {
+	GFX_LOCK;
+	
+	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
+	double lifeTime;
+	rb_get_args(argc, argv, "f", &lifeTime RB_ARG_END);
+	ps->setLifeTime((float)lifeTime);
+	
+	GFX_UNLOCK;
+	return self;
+}
+
+RB_METHOD(particleSystemGetLifeTime) {
+	GFX_LOCK;
+	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
+	float result = ps->getLifeTime();
+	GFX_UNLOCK;
+	return DBL2NUM(result);
+}
+
 RB_METHOD(particleSystemSetZOffset) {
 	GFX_LOCK;
 	
@@ -361,24 +361,38 @@ RB_METHOD(particleSystemSetSpawnSpace) {
 	GFX_LOCK;
 	
 	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	VALUE spawnSpaceObj;
-	rb_get_args(argc, argv, "o", &spawnSpaceObj RB_ARG_END);
+	VALUE innerSpaceObj;
+	VALUE outlineSpaceObj;
+	rb_get_args(argc, argv, "oo", &innerSpaceObj, &outlineSpaceObj RB_ARG_END);
 	
 	// Convert Ruby array of pairs to std::vector<std::pair<int, int>>
-	std::vector<std::pair<int, int>> spawnSpace;
-	if (RB_TYPE_P(spawnSpaceObj, RUBY_T_ARRAY)) {
-		long len = RARRAY_LEN(spawnSpaceObj);
+	std::vector<std::pair<int, int>> innerSpace;
+	if (RB_TYPE_P(innerSpaceObj, RUBY_T_ARRAY)) {
+		long len = RARRAY_LEN(innerSpaceObj);
 		for (long i = 0; i < len; ++i) {
-			VALUE pairObj = rb_ary_entry(spawnSpaceObj, i);
+			VALUE pairObj = rb_ary_entry(innerSpaceObj, i);
 			if (RB_TYPE_P(pairObj, RUBY_T_ARRAY) && RARRAY_LEN(pairObj) == 2) {
 				int x = NUM2INT(rb_ary_entry(pairObj, 0));
 				int y = NUM2INT(rb_ary_entry(pairObj, 1));
-				spawnSpace.push_back(std::make_pair(x, y));
+				innerSpace.push_back(std::make_pair(x, y));
+			}
+		}
+	}
+
+	std::vector<std::pair<int, int>> outlineSpace;
+	if (RB_TYPE_P(outlineSpaceObj, RUBY_T_ARRAY)) {
+		long len = RARRAY_LEN(outlineSpaceObj);
+		for (long i = 0; i < len; ++i) {
+			VALUE pairObj = rb_ary_entry(outlineSpaceObj, i);
+			if (RB_TYPE_P(pairObj, RUBY_T_ARRAY) && RARRAY_LEN(pairObj) == 2) {
+				int x = NUM2INT(rb_ary_entry(pairObj, 0));
+				int y = NUM2INT(rb_ary_entry(pairObj, 1));
+				outlineSpace.push_back(std::make_pair(x, y));
 			}
 		}
 	}
 	
-	ps->setSpawnSpace(spawnSpace);
+	ps->setSpawnSpaces(innerSpace, outlineSpace);
 	
 	GFX_UNLOCK;
 	return self;
@@ -402,11 +416,63 @@ RB_METHOD(particleSystemGetSpawnSpace) {
 	return rbArray;
 }
 
+RB_METHOD(particleSystemSetVelocity) {
+	GFX_LOCK;
+
+	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
+	int x, y;
+	rb_get_args(argc, argv, "ii", &x, &y RB_ARG_END);
+	ps->setVelocity(Vec2(x, y));
+	
+	GFX_UNLOCK;
+	return self;
+}
+
+RB_METHOD(particleSystemGetVelocity) {
+	GFX_LOCK;
+	
+	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
+	Vec2 velocity = ps->getVelocity();
+	VALUE rbPair = rb_ary_new2(2);
+	rb_ary_push(rbPair, INT2NUM(velocity.x));
+	rb_ary_push(rbPair, INT2NUM(velocity.y));
+
+	GFX_UNLOCK;
+	return rbPair;
+}
+
+RB_METHOD(particleSystemSetAcceleration) {
+	GFX_LOCK;
+
+	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
+	int x, y;
+	rb_get_args(argc, argv, "ii", &x, &y RB_ARG_END);
+	ps->setAcceleration(x, y);
+	
+	GFX_UNLOCK;
+	return self;
+}
+
+RB_METHOD(particleSystemGetAcceleration) {
+	GFX_LOCK;
+	
+	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
+	Vec2 acceleration = ps->getAcceleration();
+	VALUE rbPair = rb_ary_new2(2);
+	rb_ary_push(rbPair, INT2NUM(acceleration.x));
+	rb_ary_push(rbPair, INT2NUM(acceleration.y));
+
+	GFX_UNLOCK;
+	return rbPair;
+}
+
 RB_METHOD(particleSystemUpdate) {
 	GFX_LOCK;
 	
 	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	ps->update();
+	double deltaTime;
+	rb_get_args(argc, argv, "f", &deltaTime RB_ARG_END);
+	ps->update((float)deltaTime);
 	
 	GFX_UNLOCK;
 	return Qnil;
@@ -478,10 +544,6 @@ void particleSystemBindingInit() {
 	_rb_define_method(klass, "x_gravity", particleSystemGetXGravity);
 	_rb_define_method(klass, "y_gravity=", particleSystemSetYGravity);
 	_rb_define_method(klass, "y_gravity", particleSystemGetYGravity);
-	_rb_define_method(klass, "x_offset=", particleSystemSetXOffset);
-	_rb_define_method(klass, "x_offset", particleSystemGetXOffset);
-	_rb_define_method(klass, "y_offset=", particleSystemSetYOffset);
-	_rb_define_method(klass, "y_offset", particleSystemGetYOffset);
 	_rb_define_method(klass, "opacity_var=", particleSystemSetOpacityVar);
 	_rb_define_method(klass, "opacity_var", particleSystemGetOpacityVar);
 	_rb_define_method(klass, "hue_var=", particleSystemSetHueVar);
@@ -492,12 +554,20 @@ void particleSystemBindingInit() {
 	_rb_define_method(klass, "fade_size", particleSystemGetFadeSize);
 	_rb_define_method(klass, "initial_opacity=", particleSystemSetInitialOpacity);
 	_rb_define_method(klass, "initial_opacity", particleSystemGetInitialOpacity);
+	_rb_define_method(klass, "base_zoom=", particleSystemSetBaseZoom);
+	_rb_define_method(klass, "base_zoom", particleSystemGetBaseZoom);
+	_rb_define_method(klass, "life_time=", particleSystemSetLifeTime);
+	_rb_define_method(klass, "life_time", particleSystemGetLifeTime);
 	_rb_define_method(klass, "z_offset=", particleSystemSetZOffset);
 	_rb_define_method(klass, "z_offset", particleSystemGetZOffset);
 	_rb_define_method(klass, "filenames=", particleSystemSetFilenames);
 	_rb_define_method(klass, "filenames", particleSystemGetFilenames);
-	_rb_define_method(klass, "spawn_space=", particleSystemSetSpawnSpace);
+	_rb_define_method(klass, "set_spawn_space", particleSystemSetSpawnSpace);
 	_rb_define_method(klass, "spawn_space", particleSystemGetSpawnSpace);
+	_rb_define_method(klass, "velocity=", particleSystemSetVelocity);
+	_rb_define_method(klass, "velocity", particleSystemGetVelocity);
+	_rb_define_method(klass, "acceleration=", particleSystemSetAcceleration);
+	_rb_define_method(klass, "acceleration", particleSystemGetAcceleration);
 	
 	_rb_define_method(klass, "set_xy", particleSystemSetXY);
 	_rb_define_method(klass, "set_z", particleSystemSetZ);
