@@ -70,7 +70,7 @@ public:
 	void setSpawnSpaces(const std::vector<std::pair<int, int>> &spawnSpace, const std::vector<std::pair<int, int>> &outlineSpace);
 	void setVelocity(Vec2 velocity);
 	void setRandomVelocity(Vec2 velocity);
-	void setRadialVelocity(Vec2 velocity);	
+	void setRadialVelocity(Vec3 velocity);	
 	void setAcceleration(Vec2 acceleration);
 
 	// Individual getters
@@ -86,7 +86,7 @@ public:
 	const std::vector<std::pair<int, int>> &getSpawnSpace() const;
 	Vec2 getVelocity() const;
 	Vec2 getRandomVelocity() const;
-	Vec2 getRadialVelocity() const;
+	Vec3 getRadialVelocity() const;
 	Vec2 getAcceleration() const;
 
 	void update(float deltaTime);
