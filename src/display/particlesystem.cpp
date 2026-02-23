@@ -200,7 +200,7 @@ void ParticleSystem::refresh() {
 		particle->setZ(m_zoffset);
 		particle->setVelocity(m_velocity);
 
-		float startLifetime = randomFloatRange(1.0f);
+		float startLifetime = randomFloatRange(0.0f, 1.0f);
 		int particleOpacity = (int)(m_initialOpacity * (1 - startLifetime));
 		particle->setOpacity(particleOpacity);
 		
