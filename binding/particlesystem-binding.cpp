@@ -94,86 +94,6 @@ RB_METHOD(particleSystemGetHue) {
 	return INT2NUM(result);
 }
 
-RB_METHOD(particleSystemSetSlowdown) {
-	GFX_LOCK;
-	
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	double slowdown;
-	rb_get_args(argc, argv, "f", &slowdown RB_ARG_END);
-	ps->setSlowdown((float)slowdown);
-	
-	GFX_UNLOCK;
-	return self;
-}
-
-RB_METHOD(particleSystemGetSlowdown) {
-	GFX_LOCK;
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	float result = ps->getSlowdown();
-	GFX_UNLOCK;
-	return DBL2NUM(result);
-}
-
-RB_METHOD(particleSystemSetXGravity) {
-	GFX_LOCK;
-	
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	double xgravity;
-	rb_get_args(argc, argv, "f", &xgravity RB_ARG_END);
-	ps->setXGravity((float)xgravity);
-	
-	GFX_UNLOCK;
-	return self;
-}
-
-RB_METHOD(particleSystemGetXGravity) {
-	GFX_LOCK;
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	float result = ps->getXGravity();
-	GFX_UNLOCK;
-	return DBL2NUM(result);
-}
-
-RB_METHOD(particleSystemSetYGravity) {
-	GFX_LOCK;
-	
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	double ygravity;
-	rb_get_args(argc, argv, "f", &ygravity RB_ARG_END);
-	ps->setYGravity((float)ygravity);
-	
-	GFX_UNLOCK;
-	return self;
-}
-
-RB_METHOD(particleSystemGetYGravity) {
-	GFX_LOCK;
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	float result = ps->getYGravity();
-	GFX_UNLOCK;
-	return DBL2NUM(result);
-}
-
-RB_METHOD(particleSystemSetOpacityVar) {
-	GFX_LOCK;
-	
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	int opacityVar;
-	rb_get_args(argc, argv, "i", &opacityVar RB_ARG_END);
-	ps->setOpacityVar(opacityVar);
-	
-	GFX_UNLOCK;
-	return self;
-}
-
-RB_METHOD(particleSystemGetOpacityVar) {
-	GFX_LOCK;
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	int result = ps->getOpacityVar();
-	GFX_UNLOCK;
-	return INT2NUM(result);
-}
-
 RB_METHOD(particleSystemSetHueVar) {
 	GFX_LOCK;
 	
@@ -212,26 +132,6 @@ RB_METHOD(particleSystemGetSizeVar) {
 	int result = ps->getSizeVar();
 	GFX_UNLOCK;
 	return INT2NUM(result);
-}
-
-RB_METHOD(particleSystemSetFadeSize) {
-	GFX_LOCK;
-	
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	VALUE fadesize;
-	rb_get_args(argc, argv, "o", &fadesize RB_ARG_END);
-	ps->setFadeSize(RTEST(fadesize));
-	
-	GFX_UNLOCK;
-	return self;
-}
-
-RB_METHOD(particleSystemGetFadeSize) {
-	GFX_LOCK;
-	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
-	bool result = ps->getFadeSize();
-	GFX_UNLOCK;
-	return RTEST(result) ? Qtrue : Qfalse;
 }
 
 RB_METHOD(particleSystemSetInitialOpacity) {
@@ -539,20 +439,10 @@ void particleSystemBindingInit() {
 	_rb_define_method(klass, "max_particles", particleSystemGetMaxParticles);
 	_rb_define_method(klass, "hue=", particleSystemSetHue);
 	_rb_define_method(klass, "hue", particleSystemGetHue);
-	_rb_define_method(klass, "slowdown=", particleSystemSetSlowdown);
-	_rb_define_method(klass, "slowdown", particleSystemGetSlowdown);
-	_rb_define_method(klass, "x_gravity=", particleSystemSetXGravity);
-	_rb_define_method(klass, "x_gravity", particleSystemGetXGravity);
-	_rb_define_method(klass, "y_gravity=", particleSystemSetYGravity);
-	_rb_define_method(klass, "y_gravity", particleSystemGetYGravity);
-	_rb_define_method(klass, "opacity_var=", particleSystemSetOpacityVar);
-	_rb_define_method(klass, "opacity_var", particleSystemGetOpacityVar);
 	_rb_define_method(klass, "hue_var=", particleSystemSetHueVar);
 	_rb_define_method(klass, "hue_var", particleSystemGetHueVar);
 	_rb_define_method(klass, "size_var=", particleSystemSetSizeVar);
 	_rb_define_method(klass, "size_var", particleSystemGetSizeVar);
-	_rb_define_method(klass, "fade_size=", particleSystemSetFadeSize);
-	_rb_define_method(klass, "fade_size", particleSystemGetFadeSize);
 	_rb_define_method(klass, "initial_opacity=", particleSystemSetInitialOpacity);
 	_rb_define_method(klass, "initial_opacity", particleSystemGetInitialOpacity);
 	_rb_define_method(klass, "base_zoom=", particleSystemSetBaseZoom);

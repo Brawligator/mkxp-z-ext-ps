@@ -80,17 +80,14 @@ ParticleSystem::ParticleSystem(Viewport *viewport)
 	: m_viewport(viewport),
 	  m_maxParticles(0),
 	  m_hue(0),
-	  m_slowdown(1.0f),
-	  m_xgravity(0.0f),
-	  m_ygravity(0.0f),
-	  m_opacityVar(1),
 	  m_hueVar(0),
 	  m_sizeVar(0),
-	  m_fadesize(false),
 	  m_initialOpacity(255),
 	  m_baseZoom(1.0f),
-	  m_velocity(0, 0),	  m_acceleration(0, 0),
-	  m_lifeTime(1.0f),	  m_zoffset(-1),
+	  m_velocity(0, 0),	  
+	  m_acceleration(0, 0),
+	  m_lifeTime(1.0f),	  
+	  m_zoffset(-1),
 	  m_screenX(0),
 	  m_screenY(0),
 	  m_disposed(false)
@@ -203,7 +200,7 @@ void ParticleSystem::refresh() {
 		particle->setZ(m_zoffset);
 		particle->setVelocity(m_velocity);
 
-		float startLifetime = randomFloatRange(1f);
+		float startLifetime = randomFloatRange(1.0f);
 		int particleOpacity = (int)(m_initialOpacity * (1 - startLifetime));
 		particle->setOpacity(particleOpacity);
 		
@@ -217,7 +214,6 @@ void ParticleSystem::update(float deltaTime) {
 		return;
 	} */
 
-	// int randN = randomInt(m_opacityVar);
 	double iThresh = m_maxParticles * 0.9;
 
 	static const int OFFSETS[] = {-1, 1};
@@ -238,10 +234,6 @@ void ParticleSystem::update(float deltaTime) {
 
 		int particleZOffset = (i >= iThresh) ? 15 : -15;
 		particle->setZ(m_zoffset + particleZOffset);
-
-		// int randI = ((randN + i) % 2);
-
-		/* float xo = xOff * OFFSETS[randI & 1]; */
 
 		int newOpacity = particle->getOpacity() - (int)(deltaTime * 255.0f / m_lifeTime);
 
@@ -319,32 +311,12 @@ void ParticleSystem::setHue(int hue) {
 	m_hue = hue;
 }
 
-void ParticleSystem::setSlowdown(float slowdown) {
-	m_slowdown = slowdown;
-}
-
-void ParticleSystem::setXGravity(float xgravity) {
-	m_xgravity = xgravity;
-}
-
-void ParticleSystem::setYGravity(float ygravity) {
-	m_ygravity = ygravity;
-}
-
-void ParticleSystem::setOpacityVar(int opacityVar) {
-	m_opacityVar = opacityVar;
-}
-
 void ParticleSystem::setHueVar(int hueVar) {
 	m_hueVar = hueVar;
 }
 
 void ParticleSystem::setSizeVar(int sizeVar) {
 	m_sizeVar = sizeVar;
-}
-
-void ParticleSystem::setFadeSize(bool fadesize) {
-	m_fadesize = fadesize;
 }
 
 void ParticleSystem::setInitialOpacity(int opacity) {
@@ -389,32 +361,12 @@ int ParticleSystem::getHue() const {
 	return m_hue;
 }
 
-float ParticleSystem::getSlowdown() const {
-	return m_slowdown;
-}
-
-float ParticleSystem::getXGravity() const {
-	return m_xgravity;
-}
-
-float ParticleSystem::getYGravity() const {
-	return m_ygravity;
-}
-
-int ParticleSystem::getOpacityVar() const {
-	return m_opacityVar;
-}
-
 int ParticleSystem::getHueVar() const {
 	return m_hueVar;
 }
 
 int ParticleSystem::getSizeVar() const {
 	return m_sizeVar;
-}
-
-bool ParticleSystem::getFadeSize() const {
-	return m_fadesize;
 }
 
 int ParticleSystem::getInitialOpacity() const {

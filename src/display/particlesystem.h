@@ -58,13 +58,8 @@ public:
 	// Individual setters
 	void setMaxParticles(int maxParticles);
 	void setHue(int hue);
-	void setSlowdown(float slowdown);
-	void setXGravity(float xgravity);
-	void setYGravity(float ygravity);
-	void setOpacityVar(int opacityVar);
 	void setHueVar(int hueVar);
 	void setSizeVar(int sizeVar);
-	void setFadeSize(bool fadesize);
 	void setInitialOpacity(int opacity);
 	void setBaseZoom(float baseZoom);
 	void setLifeTime(float lifeTime);
@@ -77,13 +72,8 @@ public:
 	// Individual getters
 	int getMaxParticles() const;
 	int getHue() const;
-	float getSlowdown() const;
-	float getXGravity() const;
-	float getYGravity() const;
-	int getOpacityVar() const;
 	int getHueVar() const;
 	int getSizeVar() const;
-	bool getFadeSize() const;
 	int getInitialOpacity() const;
 	float getBaseZoom() const;
 	float getLifeTime() const;
@@ -106,18 +96,12 @@ private:
 	// Parameters
 	int m_maxParticles;
 	int m_hue;
-	float m_slowdown;
-	float m_xgravity;
-	float m_ygravity;
-	int m_opacityVar;
 	int m_hueVar;
 	int m_sizeVar;
-	bool m_fadesize;
 	int m_initialOpacity;
 	float m_baseZoom;
 	int m_zoffset;
 
-	float m_spawnRate;
 	Vec2 m_velocity;
 	Vec2 m_acceleration;
 	float m_lifeTime;
