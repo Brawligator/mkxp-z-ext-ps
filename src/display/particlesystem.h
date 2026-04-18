@@ -93,6 +93,7 @@ public:
 	void setScreenPosition(int x, int y);
 	void setZ(int z);
 	void refresh();
+	void stop();
 	void dispose();
 	bool isDisposed() const;
 
