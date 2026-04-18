@@ -268,8 +268,9 @@ void ParticleSystem::update(float deltaTime) {
 			particle->setY(m_cameraY + startPos.second);
 			particle->setZoomX(m_baseZoom);
 			particle->setZoomY(m_baseZoom);
-			particle->setLife((m_initialOpacity + newOpacity) * m_lifeTime / 255.0f);
-			particle->setOpacity(m_initialOpacity + newOpacity);
+			particle->setLife(0);
+			// particle->setLife((m_initialOpacity + newOpacity) * m_lifeTime / 255.0f);
+			// particle->setOpacity(m_initialOpacity + newOpacity);
 			particle->setVelocity(Vec2(m_velocity.x + randomFloatRange(-1.0f, 1.0f) * m_random_velocity.x, m_velocity.y + randomFloatRange(-1.0f, 1.0f) * m_random_velocity.y));
 			continue;
 		}
