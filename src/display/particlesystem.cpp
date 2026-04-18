@@ -264,14 +264,14 @@ void ParticleSystem::update(float deltaTime) {
 			bool useInner = i >= iThresh;
 			auto startPos = sampleFromSpace(useInner);
 			particle->setBasePosition(Vec2(startPos.first + m_systemX, startPos.second + m_systemY));
-			particle->setX(m_cameraX + startPos.first);
-			particle->setY(m_cameraY + startPos.second);
+			particle->setX(m_cameraX + startPos.first + m_systemX);
+			particle->setY(m_cameraY + startPos.second + m_systemY);
 			particle->setZoomX(m_baseZoom);
 			particle->setZoomY(m_baseZoom);
-			particle->setLife(0);
-			particle->setOpacity(m_initialOpacity);
-			// particle->setLife((m_initialOpacity + newOpacity) * m_lifeTime / 255.0f);
-			// particle->setOpacity(m_initialOpacity + newOpacity);
+			// particle->setLife(0);
+			// particle->setOpacity(m_initialOpacity);
+			particle->setLife((1 - (m_initialOpacity + newOpacity) / 255.0f) * m_lifeTime);
+			particle->setOpacity(m_initialOpacity + newOpacity);
 			particle->setVelocity(Vec2(m_velocity.x + randomFloatRange(-1.0f, 1.0f) * m_random_velocity.x, m_velocity.y + randomFloatRange(-1.0f, 1.0f) * m_random_velocity.y));
 			continue;
 		}
