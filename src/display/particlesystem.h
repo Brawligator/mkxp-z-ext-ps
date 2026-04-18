@@ -107,6 +107,7 @@ private:
 	int m_initialOpacity;
 	float m_baseZoom;
 	int m_zoffset;
+	bool m_stopped;
 
 	Vec2 m_velocity;
 	Vec2 m_acceleration;

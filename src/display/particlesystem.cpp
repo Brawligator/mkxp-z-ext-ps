@@ -97,7 +97,8 @@ ParticleSystem::ParticleSystem(Viewport *viewport)
 	  m_zoffset(-1),
 	  m_screenX(0),
 	  m_screenY(0),
-	  m_disposed(false)
+	  m_disposed(false),
+	  m_stopped(false)
 {
 	g_rng.seed(std::random_device{}());
 }
@@ -219,6 +220,10 @@ void ParticleSystem::refresh() {
 	}
 }
 
+void ParticleSystem::stop() {
+	m_stopped = true;
+}
+
 void ParticleSystem::update(float deltaTime) {
 	/* if (m_viewport && (m_viewport->getRect().x >= 640 || m_viewport->getRect().y >= 480)) {
 		return;
@@ -226,30 +231,34 @@ void ParticleSystem::update(float deltaTime) {
 
 	double iThresh = m_maxParticles * 0.9;
 
-	static const int OFFSETS[] = {-1, 1};
-
 	for (int i = 0; i < m_maxParticles; ++i) {
 		if (i >= m_particles.size()) break;
 
 		Particle *particle = m_particles[i];
 		
 		if (!particle) continue;
+		if (m_stopped && particle->getOpacity() <= 0) continue;
 
 		Vec2 newVelocity = Vec2(particle->getVelocity().x + m_acceleration.x * deltaTime,
 		                       particle->getVelocity().y + m_acceleration.y * deltaTime);
 		particle->setVelocity(newVelocity);
 		particle->setLife(particle->getLife() + deltaTime);
 
-		particle->setX(m_screenX + particle->getBasePosition().x + (particle->getVelocity().x + cos(particle->getLife() * m_hueVar)*m_radial_velocity.x + sin(particle->getLife() * m_hueVar)*m_radial_velocity.z) * particle->getLife());
-		particle->setY(m_screenY + particle->getBasePosition().y + (particle->getVelocity().y + sin(particle->getLife() * m_hueVar)*m_radial_velocity.y + cos(particle->getLife() * m_hueVar)*m_radial_velocity.z) * particle->getLife());
+
+		float radial_component_x = cos(particle->getLife() * m_hueVar)*m_radial_velocity.x + sin(particle->getLife() * m_hueVar)*m_radial_velocity.z;
+		float radial_component_y = sin(particle->getLife() * m_hueVar)*m_radial_velocity.y + cos(particle->getLife() * m_hueVar)*m_radial_velocity.z;
+		float newX = m_screenX + particle->getBasePosition().x + (particle->getVelocity().x + radial_component_x) * particle->getLife();
+		float newY = m_screenY + particle->getBasePosition().y + (particle->getVelocity().y + radial_component_y) * particle->getLife();
+
+		particle->setX(newX);
+		particle->setY(newY);
 
 		int particleZOffset = (i >= iThresh) ? 15 : -15;
 		particle->setZ(m_zoffset + particleZOffset);
 
 		int newOpacity = particle->getOpacity() - (int)(deltaTime * 255.0f / m_lifeTime);
 
-		if (newOpacity <= 0) {
-			particle->setOpacity(m_initialOpacity);
+		if (newOpacity <= 0 && !m_stopped) {
 			bool useInner = i >= iThresh;
 			auto startPos = sampleFromSpace(useInner);
 			particle->setBasePosition(Vec2(startPos.first, startPos.second));
@@ -257,7 +266,8 @@ void ParticleSystem::update(float deltaTime) {
 			particle->setY(m_screenY + startPos.second);
 			particle->setZoomX(m_baseZoom);
 			particle->setZoomY(m_baseZoom);
-			particle->setLife(0);
+			particle->setLife((m_initialOpacity - newOpacity) * m_lifeTime / 255.0f);
+			particle->setOpacity(m_initialOpacity - newOpacity);
 			particle->setVelocity(Vec2(m_velocity.x + randomFloatRange(-1.0f, 1.0f) * m_random_velocity.x, m_velocity.y + randomFloatRange(-1.0f, 1.0f) * m_random_velocity.y));
 			continue;
 		}

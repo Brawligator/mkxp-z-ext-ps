@@ -329,6 +329,16 @@ RB_METHOD(particleSystemRefresh) {
 	return Qnil;
 }
 
+RB_METHOD(particleSystemStop) {
+	GFX_LOCK;
+	
+	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
+	ps->stop();
+
+	GFX_UNLOCK;
+	return Qnil;
+}
+
 RB_METHOD(particleSystemSetXY) {
 	GFX_LOCK;
 
@@ -394,4 +404,5 @@ void particleSystemBindingInit() {
 	_rb_define_method(klass, "update", particleSystemUpdate);
 	_rb_define_method(klass, "dispose", particleSystemDispose);
 	_rb_define_method(klass, "refresh", particleSystemRefresh);
+	_rb_define_method(klass, "stop", particleSystemStop);
 }
