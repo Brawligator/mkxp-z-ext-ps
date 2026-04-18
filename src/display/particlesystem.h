@@ -90,7 +90,8 @@ public:
 	Vec2 getAcceleration() const;
 
 	void update(float deltaTime);
-	void setScreenPosition(int x, int y);
+	void setSystemPosition(int x, int y);
+	void setCameraPosition(int x, int y);
 	void setZ(int z);
 	void refresh();
 	void stop();
@@ -120,8 +121,10 @@ private:
 	std::vector<Particle*> m_particles;
 
 	// State
-	float m_screenX;
-	float m_screenY;
+	float m_cameraX;
+	float m_cameraY;
+	float m_systemX;
+	float m_systemY;
 
 	// Bitmap cache
 	std::map<BitmapKey, Bitmap*> m_bitmaps;

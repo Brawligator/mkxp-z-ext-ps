@@ -345,7 +345,19 @@ RB_METHOD(particleSystemSetXY) {
 	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
 	int x, y;
 	rb_get_args(argc, argv, "ii", &x, &y RB_ARG_END);
-	ps->setScreenPosition(x, y);
+	ps->setSystemPosition(x, y);
+	
+	GFX_UNLOCK;
+	return self;
+}
+
+RB_METHOD(particleSystemSetCameraXY) {
+	GFX_LOCK;
+
+	ParticleSystem *ps = getPrivateData<ParticleSystem>(self);
+	int x, y;
+	rb_get_args(argc, argv, "ii", &x, &y RB_ARG_END);
+	ps->setCameraPosition(x, y);
 	
 	GFX_UNLOCK;
 	return self;
@@ -398,7 +410,8 @@ void particleSystemBindingInit() {
 	_rb_define_method(klass, "set_spawn_space", particleSystemSetSpawnSpace);
 	_rb_define_method(klass, "spawn_space", particleSystemGetSpawnSpace);
 	
-	_rb_define_method(klass, "set_xy", particleSystemSetXY);
+	_rb_define_method(klass, "set_system_pos", particleSystemSetXY);
+	_rb_define_method(klass, "set_scamera_pos", particleSystemSetCameraXY);
 	_rb_define_method(klass, "set_z", particleSystemSetZ);
 	
 	_rb_define_method(klass, "update", particleSystemUpdate);

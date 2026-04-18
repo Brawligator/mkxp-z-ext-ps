@@ -95,8 +95,10 @@ ParticleSystem::ParticleSystem(Viewport *viewport)
 	  m_acceleration(0, 0),
 	  m_lifeTime(1.0f),	  
 	  m_zoffset(-1),
-	  m_screenX(0),
-	  m_screenY(0),
+	  m_cameraX(0),
+	  m_cameraY(0),
+	  m_systemX(0),
+	  m_systemY(0),
 	  m_disposed(false),
 	  m_stopped(false)
 {
@@ -190,7 +192,7 @@ void ParticleSystem::refresh() {
 		Particle *particle = new Particle(m_viewport);
 		m_particles.push_back(particle);
 
-		particle->setBasePosition(Vec2(startPos.first, startPos.second));
+		particle->setBasePosition(Vec2(startPos.first + m_systemX, startPos.second + m_systemY));
 
 		if (!m_filenames.empty()) {
 			const std::string &filename = m_filenames[randomInt(m_filenames.size())];
@@ -205,8 +207,8 @@ void ParticleSystem::refresh() {
 			}
 		}
 
-		particle->setX(m_screenX + startPos.first);
-		particle->setY(m_screenY + startPos.second);
+		particle->setX(m_cameraX + startPos.first);
+		particle->setY(m_cameraY + startPos.second);
 		particle->setZ(m_zoffset);
 		particle->setVelocity(Vec2(m_velocity.x + randomFloatRange(-1.0f, 1.0f) * m_random_velocity.x, m_velocity.y + randomFloatRange(-1.0f, 1.0f) * m_random_velocity.y));
 
@@ -247,8 +249,8 @@ void ParticleSystem::update(float deltaTime) {
 
 		float radial_component_x = cos(particle->getLife() * m_hueVar)*m_radial_velocity.x + sin(particle->getLife() * m_hueVar)*m_radial_velocity.z;
 		float radial_component_y = sin(particle->getLife() * m_hueVar)*m_radial_velocity.y + cos(particle->getLife() * m_hueVar)*m_radial_velocity.z;
-		float newX = m_screenX + particle->getBasePosition().x + (particle->getVelocity().x + radial_component_x) * particle->getLife();
-		float newY = m_screenY + particle->getBasePosition().y + (particle->getVelocity().y + radial_component_y) * particle->getLife();
+		float newX = m_cameraX + particle->getBasePosition().x + (particle->getVelocity().x + radial_component_x) * particle->getLife();
+		float newY = m_cameraY + particle->getBasePosition().y + (particle->getVelocity().y + radial_component_y) * particle->getLife();
 
 		particle->setX(newX);
 		particle->setY(newY);
@@ -261,13 +263,13 @@ void ParticleSystem::update(float deltaTime) {
 		if (newOpacity <= 0 && !m_stopped) {
 			bool useInner = i >= iThresh;
 			auto startPos = sampleFromSpace(useInner);
-			particle->setBasePosition(Vec2(startPos.first, startPos.second));
-			particle->setX(m_screenX + startPos.first);
-			particle->setY(m_screenY + startPos.second);
+			particle->setBasePosition(Vec2(startPos.first + m_systemX, startPos.second + m_systemY));
+			particle->setX(m_cameraX + startPos.first);
+			particle->setY(m_cameraY + startPos.second);
 			particle->setZoomX(m_baseZoom);
 			particle->setZoomY(m_baseZoom);
-			particle->setLife((m_initialOpacity - newOpacity) * m_lifeTime / 255.0f);
-			particle->setOpacity(m_initialOpacity - newOpacity);
+			particle->setLife((m_initialOpacity + newOpacity) * m_lifeTime / 255.0f);
+			particle->setOpacity(m_initialOpacity + newOpacity);
 			particle->setVelocity(Vec2(m_velocity.x + randomFloatRange(-1.0f, 1.0f) * m_random_velocity.x, m_velocity.y + randomFloatRange(-1.0f, 1.0f) * m_random_velocity.y));
 			continue;
 		}
@@ -281,18 +283,24 @@ void ParticleSystem::update(float deltaTime) {
 	}
 }
 
-void ParticleSystem::setScreenPosition(int x, int y)
+void ParticleSystem::setSystemPosition(int x, int y)
 {
-	float oldX = m_screenX;
-	float oldY = m_screenY;
+	m_systemX = x;
+	m_systemY = y;
+}
 
-	m_screenX = x;
-	m_screenY = y;
+void ParticleSystem::setCameraPosition(int x, int y)
+{
+	float oldX = m_cameraX;
+	float oldY = m_cameraY;
+
+	m_cameraX = x;
+	m_cameraY = y;
 
 	for (auto particle : m_particles) {
 		if (particle) {
-			particle->setX(particle->getX() + (m_screenX - oldX));
-			particle->setY(particle->getY() + (m_screenY - oldY));
+			particle->setX(particle->getX() + (m_cameraX - oldX));
+			particle->setY(particle->getY() + (m_cameraY - oldY));
 		}
 	}
 }
