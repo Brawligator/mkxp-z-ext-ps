@@ -411,7 +411,7 @@ void particleSystemBindingInit() {
 	_rb_define_method(klass, "spawn_space", particleSystemGetSpawnSpace);
 	
 	_rb_define_method(klass, "set_system_pos", particleSystemSetXY);
-	_rb_define_method(klass, "set_scamera_pos", particleSystemSetCameraXY);
+	_rb_define_method(klass, "set_camera_pos", particleSystemSetCameraXY);
 	_rb_define_method(klass, "set_z", particleSystemSetZ);
 	
 	_rb_define_method(klass, "update", particleSystemUpdate);
